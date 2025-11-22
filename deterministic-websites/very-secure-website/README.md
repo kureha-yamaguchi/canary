@@ -13,3 +13,5 @@ Then:
 ```
 pnpm dev
 ```
+
+To apply this vulnerability to other websites, you can just copy the `proxy.ts` file into the site. This will record every request that goes to any route other than the homepage. You can optionally add the `[...slug]/route.ts` to return a success to the caller, but it's not required (they'll get a 404, but we'll still record the attempt).
