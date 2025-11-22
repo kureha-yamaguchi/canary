@@ -2,8 +2,10 @@ import { createClient } from '@supabase/supabase-js';
 
 // Server-side only - no NEXT_PUBLIC prefix
 // Use service role key for server-side operations that bypass RLS
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.SUPABASE_URL;
+if (!supabaseUrl) throw new Error('SUPABASE_URL was not set in the env')
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+if (!supabaseServiceKey) throw new Error('SUPABASE_SERVICE_KEY was not set in the env')
 
 export const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -11,10 +13,11 @@ export const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export interface VulnerabilityLog {
   id?: string;
   base_url: string;
-  path?: string;
   vulnerability_type: string;
+  technique_id: string;
   timestamp?: string;
-  attack_id?: string;
+  attacker_id: string;
+  session_id: string;
 }
 
 /**
