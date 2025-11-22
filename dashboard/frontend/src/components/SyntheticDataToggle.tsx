@@ -5,12 +5,12 @@ interface SyntheticDataToggleProps {
 
 export function SyntheticDataToggle({ includeSynthetic, onToggle }: SyntheticDataToggleProps) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2 bg-slate-800 rounded-lg border border-slate-700">
-      <label className="text-sm text-slate-300">Include Synthetic Data</label>
+    <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+      <label className="text-sm text-gray-700 font-medium">Include Synthetic Data</label>
       <button
         onClick={() => onToggle(!includeSynthetic)}
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-          includeSynthetic ? 'bg-blue-600' : 'bg-slate-600'
+          includeSynthetic ? 'bg-blue-600' : 'bg-gray-300'
         }`}
       >
         <span
@@ -19,7 +19,7 @@ export function SyntheticDataToggle({ includeSynthetic, onToggle }: SyntheticDat
           }`}
         />
       </button>
-      <span className="text-xs text-slate-400">
+      <span className="text-xs text-gray-600">
         {includeSynthetic ? 'Showing all data' : 'Excluding synthetic'}
       </span>
     </div>

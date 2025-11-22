@@ -61,12 +61,12 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
         <ChartSection title="Attack Timeline (24h)" defaultExpanded={true}>
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={timeSeriesData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-              <XAxis dataKey="time" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="time" stroke="#6b7280" />
+              <YAxis stroke="#6b7280" />
               <Tooltip
-                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
-                labelStyle={{ color: '#e2e8f0' }}
+                contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}
+                labelStyle={{ color: '#111827' }}
               />
               <Legend />
               <Line
@@ -97,19 +97,19 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
           <ChartSection title="Top Vulnerabilities">
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={vulnerabilityData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
                   dataKey="name" 
-                  stroke="#94a3b8" 
+                  stroke="#6b7280" 
                   angle={-45} 
                   textAnchor="end" 
                   height={120}
                   tick={{ fontSize: 12 }}
                 />
-                <YAxis stroke="#94a3b8" />
+                <YAxis stroke="#6b7280" />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
-                  labelStyle={{ color: '#e2e8f0' }}
+                  contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}
+                  labelStyle={{ color: '#111827' }}
                   formatter={(value: any, name: string, props: any) => {
                     if (props.payload?.fullName) {
                       return [props.payload.fullName, name]
@@ -130,19 +130,19 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
           <ChartSection title="Most Targeted Websites">
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={websiteData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis 
                   dataKey="name" 
-                  stroke="#94a3b8" 
+                  stroke="#6b7280" 
                   angle={-45} 
                   textAnchor="end" 
                   height={120}
                   tick={{ fontSize: 12 }}
                 />
-                <YAxis stroke="#94a3b8" />
+                <YAxis stroke="#6b7280" />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
-                  labelStyle={{ color: '#e2e8f0' }}
+                  contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}
+                  labelStyle={{ color: '#111827' }}
                   formatter={(value: any, name: string, props: any) => {
                     if (props.payload?.fullName) {
                       return [props.payload.fullName, name]
@@ -163,12 +163,12 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
           <ChartSection title="MITRE ATT&CK Techniques">
             <ResponsiveContainer width="100%" height={400}>
               <BarChart data={techniqueData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-                <XAxis dataKey="name" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="name" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }}
-                  labelStyle={{ color: '#e2e8f0' }}
+                  contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}
+                  labelStyle={{ color: '#111827' }}
                 />
                 <Legend />
                 <Bar dataKey="total" fill="#8b5cf6" name="Total" />
@@ -181,14 +181,14 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
 
       {/* Vulnerability Lists */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-slate-800 rounded-lg shadow-lg p-6">
-          <h3 className="text-xl font-bold text-white mb-4">Successfully Exploited</h3>
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Successfully Exploited</h3>
           <div className="space-y-2">
             {stats.successful_vulnerabilities.length === 0 ? (
-              <p className="text-slate-400">None</p>
+              <p className="text-gray-500">None</p>
             ) : (
               stats.successful_vulnerabilities.map((vuln, idx) => (
-                <div key={idx} className="p-2 bg-red-900/20 rounded text-sm text-red-300 break-words" title={vuln}>
+                <div key={idx} className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 break-words" title={vuln}>
                   {formatVulnerabilityType(vuln, 50)}
                 </div>
               ))
@@ -196,14 +196,14 @@ export function StatsOverview({ stats }: StatsOverviewProps) {
           </div>
         </div>
 
-        <div className="bg-slate-800 rounded-lg shadow-lg p-6">
-          <h3 className="text-xl font-bold text-white mb-4">Failed Exploitation Attempts</h3>
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Failed Exploitation Attempts</h3>
           <div className="space-y-2">
             {stats.failed_vulnerabilities.length === 0 ? (
-              <p className="text-slate-400">None</p>
+              <p className="text-gray-500">None</p>
             ) : (
               stats.failed_vulnerabilities.map((vuln, idx) => (
-                <div key={idx} className="p-2 bg-yellow-900/20 rounded text-sm text-yellow-300 break-words" title={vuln}>
+                <div key={idx} className="p-2 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-700 break-words" title={vuln}>
                   {formatVulnerabilityType(vuln, 50)}
                 </div>
               ))
@@ -222,10 +222,10 @@ function MetricCard({ title, value, subtitle, color }: {
   color: string
 }) {
   return (
-    <div className="bg-slate-800 rounded-lg shadow-lg p-6">
-      <div className="text-sm text-slate-400 mb-1">{title}</div>
+    <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+      <div className="text-sm text-gray-600 mb-1">{title}</div>
       <div className={`text-3xl font-bold ${color} mb-1`}>{value}</div>
-      <div className="text-xs text-slate-500">{subtitle}</div>
+      <div className="text-xs text-gray-500">{subtitle}</div>
     </div>
   )
 }

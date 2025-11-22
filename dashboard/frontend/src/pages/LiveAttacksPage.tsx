@@ -4,7 +4,6 @@ import { StatsOverview } from '../components/StatsOverview'
 import { KeyMetrics } from '../components/KeyMetrics'
 import { AttackFilters } from '../components/AttackFilters'
 import { SyntheticDataToggle } from '../components/SyntheticDataToggle'
-import MITREAttackMatrix from '../components/MitreMatrix'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { Attack, Stats } from '../types'
 
@@ -93,9 +92,6 @@ export function LiveAttacksPage() {
 
   return (
     <div className="space-y-8">
-      {/* MITRE ATT&CK Matrix at the top */}
-      <MITREAttackMatrix />
-
       {/* Synthetic Data Toggle */}
       <div className="flex justify-end">
         <SyntheticDataToggle 
@@ -124,25 +120,25 @@ export function LiveAttacksPage() {
         
         {/* Quick Stats Sidebar */}
         <div className="space-y-4">
-          <div className="bg-slate-800 rounded-lg shadow-lg p-6">
-            <h3 className="text-lg font-bold text-white mb-4">Quick Stats</h3>
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Stats</h3>
             {stats && (
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">30d Attacks:</span>
-                  <span className="text-white font-semibold">{stats.attacks_30d.toLocaleString()}</span>
+                  <span className="text-gray-600">30d Attacks:</span>
+                  <span className="text-gray-900 font-semibold">{stats.attacks_30d.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Success Rate:</span>
-                  <span className="text-red-400 font-semibold">
+                  <span className="text-gray-600">Success Rate:</span>
+                  <span className="text-red-600 font-semibold">
                     {stats.total_attacks > 0 
                       ? ((stats.successful_attacks / stats.total_attacks) * 100).toFixed(1)
                       : 0}%
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Top Technique:</span>
-                  <span className="text-white font-semibold">
+                  <span className="text-gray-600">Top Technique:</span>
+                  <span className="text-gray-900 font-semibold">
                     {stats.technique_stats.length > 0 
                       ? stats.technique_stats[0].technique_id 
                       : 'N/A'}

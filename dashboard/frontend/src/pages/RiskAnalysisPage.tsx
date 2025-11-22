@@ -11,20 +11,20 @@ export function RiskAnalysisPage() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-800 rounded-lg shadow-lg p-6 mb-6">
-        <h2 className="text-2xl font-bold text-white mb-2">Risk Analysis & Forecasting</h2>
-        <p className="text-slate-400 mb-4">
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border border-gray-200">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Risk Analysis & Forecasting</h2>
+        <p className="text-gray-600 mb-4">
           MITRE ATT&CK-based risk classification and projection for cyber attack monitoring.
         </p>
         
         {/* Tab Navigation */}
-        <div className="flex gap-4 border-b border-slate-700">
+        <div className="flex gap-4 border-b border-gray-200">
           <button
             onClick={() => setActiveTab('portfolio')}
             className={`px-4 py-2 font-semibold transition-colors ${
               activeTab === 'portfolio'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-slate-400 hover:text-white'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-600 hover:text-blue-600'
             }`}
           >
             MITRE Risk Portfolio
@@ -33,8 +33,8 @@ export function RiskAnalysisPage() {
             onClick={() => setActiveTab('advanced-forecast')}
             className={`px-4 py-2 font-semibold transition-colors ${
               activeTab === 'advanced-forecast'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-slate-400 hover:text-white'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-600 hover:text-blue-600'
             }`}
           >
             Advanced Forecast
@@ -43,8 +43,8 @@ export function RiskAnalysisPage() {
             onClick={() => setActiveTab('forecast')}
             className={`px-4 py-2 font-semibold transition-colors ${
               activeTab === 'forecast'
-                ? 'text-blue-400 border-b-2 border-blue-400'
-                : 'text-slate-400 hover:text-white'
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-600 hover:text-blue-600'
             }`}
           >
             Classic Forecast
@@ -55,8 +55,8 @@ export function RiskAnalysisPage() {
       {activeTab === 'portfolio' && <MitreRiskPortfolio />}
       {activeTab === 'advanced-forecast' && <AdvancedRiskForecast />}
       {activeTab === 'forecast' && (
-        <div className="bg-slate-800 rounded-lg shadow-lg p-6">
-          <p className="text-slate-400">
+        <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+          <p className="text-gray-600">
             Traditional risk forecasting view - coming soon with enhanced MITRE integration.
           </p>
         </div>

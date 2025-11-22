@@ -10,14 +10,14 @@ export function ChartSection({ title, children, defaultExpanded = false }: Chart
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
 
   return (
-    <div className="bg-slate-800 rounded-lg shadow-lg overflow-hidden">
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-700/50 transition-colors"
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
       >
-        <h3 className="text-xl font-bold text-white">{title}</h3>
+        <h3 className="text-xl font-bold text-gray-900">{title}</h3>
         <svg
-          className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 text-gray-600 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -26,7 +26,7 @@ export function ChartSection({ title, children, defaultExpanded = false }: Chart
         </svg>
       </button>
       {isExpanded && (
-        <div className="p-6 border-t border-slate-700">
+        <div className="p-6 border-t border-gray-200">
           {children}
         </div>
       )}
