@@ -3,6 +3,20 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { logHoneypotTrigger } from '@/lib/supabase';
 
+/**
+ * Generate a session ID from request headers
+ */
+function getSessionId(request: Request): string {
+  // Use IP address and timestamp for session tracking
+  const ip = request.headers.get('x-forwarded-for') ||
+             request.headers.get('x-real-ip') ||
+             'unknown';
+
+  // Create a simple hash-like session ID
+  const timestamp = Date.now();
+  return `${ip.split(',')[0]}_${timestamp}`;
+}
+
 // 🔥 TOGGLE VULNERABILITY HERE 🔥
 const VULNERABLE_MODE = true; // Set to false for secure mode
 
@@ -76,12 +90,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const attacker_id = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
+
     // Log successful attack if HS256 was used
     if (isAttackAttempt || algorithmUsed === 'HS256') {
       console.log('🚨 Logging attack to honeypot...');
       await logHoneypotTrigger({
-        vulnerability_type: 'jwt_algorithm_confusion',
-        base_url: process.env.VERCEL_PROJECT_PRODUCTION_URL ?? 'unknown',
+        vulnerability_type: 'jwt-algorithm-confusion',
+        base_url: process.env.VERCEL_PROJECT_PRODUCTION_URL ?? 'http://localhost:3000',
+        technique_id: 'T1212', // Expoloitation for Credential Access
+        attacker_id,
+        session_id: getSessionId(request),
       });
     }
 
