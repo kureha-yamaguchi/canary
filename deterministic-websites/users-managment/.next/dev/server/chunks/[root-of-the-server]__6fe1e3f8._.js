@@ -157,45 +157,85 @@ function checkSqlInjection(input) {
     return `${ip.split(',')[0]}_${timestamp}`;
 }
 async function logSqlInjectionAttempt(result, request, route) {
+    // Only log when SQL injection is actually detected
+    if (result.status !== 'injection_detected') {
+        console.log(`[Honeypot] Skipping log for status: ${result.status} (only logging injection_detected)`);
+        return;
+    }
     const url = new URL(request.url);
-    // Map the result status to specific vulnerability types
-    const vulnerabilityType = result.status === 'injection_detected' ? 'sql-injection-attempt' : result.status === 'suspicious' ? 'sql-injection-suspicious' : 'sql-injection-normal';
+    // Use consistent vulnerability type for SQL injection
+    const vulnerabilityType = 'SQL_INJECTION';
     // Extract attacker_id (IP address or other identifier)
     const attackerId = request.headers.get('x-forwarded-for')?.split(',')[0] || request.headers.get('x-real-ip') || 'unknown';
     // Get session ID for tracking
     const sessionId = getSessionId(request);
     // Get appropriate MITRE ATT&CK technique ID
     const techniqueId = getTechniqueId(vulnerabilityType);
+    // Build the path (include route if provided, otherwise use URL pathname)
+    const path = route || url.pathname;
     const payload = {
         base_url: url.origin,
+        path: path,
         vulnerability_type: vulnerabilityType,
         technique_id: techniqueId,
         attacker_id: attackerId,
         session_id: sessionId
     };
-    // Add additional context for SQL injection
-    if (result.status === 'injection_detected') {
-        payload.sql_payload = result.payload;
-        payload.vulnerable_query = result.query;
-    } else if (result.status === 'suspicious') {
-        payload.sql_payload = result.payload;
-        payload.suspicious_reason = result.reason;
-    }
-    console.log('[Honeypot] Attempting to log SQL injection to Supabase:', payload);
+    console.log('[Honeypot] Attempting to log SQL injection to vulnerability_logs:', {
+        ...payload,
+        sql_payload: result.payload,
+        vulnerable_query: result.query
+    });
     // Check if Supabase is configured
     if (!__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$supabase$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["supabase"]) {
         console.warn('[Honeypot] Supabase not configured - skipping database log. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local');
         return;
     }
     try {
-        const { data, error } = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$supabase$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["supabase"].from('vulnerability_logs').insert(payload);
+        // First, ensure the technique exists in the techniques table
+        // This handles the foreign key constraint requirement
+        const { error: techniqueError } = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$supabase$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["supabase"].from('techniques').upsert({
+            technique_id: techniqueId,
+            name: 'Exploit Public-Facing Application',
+            description: 'Attackers exploit vulnerabilities in internet-facing web servers, including SQL injection attacks',
+            domain: 'enterprise'
+        }, {
+            onConflict: 'technique_id',
+            ignoreDuplicates: false
+        });
+        if (techniqueError) {
+            console.warn('[Honeypot] Could not ensure technique exists (may already exist):', techniqueError);
+        // Continue anyway - the technique might already exist
+        }
+        // Try inserting with path first
+        let insertPayload = payload;
+        let { data, error } = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$supabase$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["supabase"].from('vulnerability_logs').insert(insertPayload);
+        // If error is due to path column not existing, try without it
+        if (error && (error.code === 'PGRST116' || error.message?.includes('column') || error.message?.includes('path'))) {
+            console.warn('[Honeypot] Retrying insert without path field (column may not exist)');
+            const { path, ...payloadWithoutPath } = payload;
+            insertPayload = payloadWithoutPath;
+            ({ data, error } = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$supabase$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["supabase"].from('vulnerability_logs').insert(insertPayload));
+        }
         if (error) {
-            console.error('[Honeypot] Failed to log to Supabase:', error);
+            console.error('[Honeypot] Failed to log SQL injection to Supabase:');
+            console.error('[Honeypot] Error code:', error.code);
+            console.error('[Honeypot] Error message:', error.message);
+            console.error('[Honeypot] Error details:', error.details);
+            console.error('[Honeypot] Error hint:', error.hint);
+            console.error('[Honeypot] Payload attempted:', JSON.stringify(insertPayload, null, 2));
+            console.error('[Honeypot] Full error:', JSON.stringify(error, null, 2));
         } else {
-            console.log('[Honeypot] Successfully logged to Supabase:', data);
+            console.log('[Honeypot] ✅ Successfully logged SQL injection to vulnerability_logs table');
+            console.log('[Honeypot] Log ID:', data?.[0]?.id || 'unknown');
+            console.log('[Honeypot] Logged data:', JSON.stringify(data, null, 2));
         }
     } catch (err) {
-        console.error('[Honeypot] Exception while logging:', err);
+        console.error('[Honeypot] Exception while logging SQL injection:', err);
+        if (err instanceof Error) {
+            console.error('[Honeypot] Exception message:', err.message);
+            console.error('[Honeypot] Exception stack:', err.stack);
+        }
     }
 }
 }),
@@ -220,7 +260,13 @@ async function POST(request) {
         const username = body.username || '';
         // Check for SQL injection attempts
         const injectionCheck = (0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$honeypot$2d$utils$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["checkSqlInjection"])(username);
-        // Log the attempt to Supabase
+        // Debug logging
+        console.log('[Honeypot] SQL Injection check result:', {
+            status: injectionCheck.status,
+            payload: injectionCheck.payload,
+            detected: injectionCheck.status === 'injection_detected'
+        });
+        // Log the attempt to Supabase (only logs when injection_detected)
         await (0, __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$honeypot$2d$utils$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["logSqlInjectionAttempt"])(injectionCheck, request, '/api/search');
         // VULNERABLE CODE: Direct string concatenation into SQL query
         // This is the vulnerability - user input is not sanitized or parameterized

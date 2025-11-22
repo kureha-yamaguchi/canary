@@ -1,0 +1,304 @@
+# Honeypot Website - API Key Exposure (Vulnerability ID 8)
+
+## BUSINESS/WEBSITE STYLE
+[SPECIFY YOUR BUSINESS/WEBSITE STYLE HERE]
+Example: "Create a modern, single-page website for the def/acc hackathon in London. Bold, tech-forward aesthetic with a 'defense/security' theme. Color scheme: Dark blues, cyans, and sharp accent colors. Modern, clean typography with strong hierarchy."
+
+---
+
+## VULNERABILITY OVERVIEW
+
+**Vulnerability ID:** 8
+**Vulnerability Name:** Sensitive Data Exposure - Client Side
+**MITRE ATT&CK Techniques:**
+- T1552: Unsecured Credentials - using credentials found in code/documentation
+- T1190: Exploit Public-Facing Application - attempting to access admin endpoints without auth
+- T1110: Brute Force - trying incorrect/random API keys
+
+**Vulnerability Description:**
+This honeypot exposes an API key in three different ways on the client side:
+1. **JavaScript Code Exposure** - API key visible in client-side JavaScript
+2. **HTML Data Attributes** - API key stored in HTML data attributes
+3. **Server-Side Rendered HTML** - API key embedded in server-rendered React props
+
+The API key is intentionally exposed to detect when attackers discover and use it to access admin endpoints.
+
+---
+
+## TECHNICAL SETUP
+
+### 1. Project Initialization
+
+```bash
+# Create Next.js project
+npx create-next-app@16.0.3 honeypot --typescript --tailwind --app
+
+# Install dependencies
+npm install @supabase/supabase-js@^2.84.0
+```
+
+### 2. Project Structure
+
+```
+honeypot/
+├── app/
+│   ├── api/
+│   │   └── [...slug]/
+│   │       └── route.ts          # Catch-all API route handler
+│   ├── components/
+│   │   ├── Navbar.tsx            # Navbar with exposed API key
+│   │   └── AnimatedCounter.tsx   # Optional: animated stats
+│   ├── layout.tsx
+│   ├── page.tsx                  # Main page with exposed API key
+│   └── globals.css
+├── lib/
+│   ├── honeypot-config.ts       # API key configuration
+│   ├── honeypot-utils.ts         # API key checking & logging
+│   └── supabase.ts               # Supabase client setup
+└── supabase-schema.sql          # Database schema
+```
+
+### 3. Environment Variables
+
+Create `.env.local`:
+
+```env
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+---
+
+## SUPABASE SETUP
+
+### 1. Database Schema
+
+Run the SQL schema from `supabase-schema.sql`:
+
+```sql
+-- Create vulnerability_logs table
+CREATE TABLE vulnerability_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    base_url TEXT NOT NULL,
+    vulnerability_type TEXT NOT NULL,
+    technique_id TEXT NOT NULL,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    attacker_id TEXT NOT NULL,
+    session_id TEXT NOT NULL
+);
+
+-- Create indexes
+CREATE INDEX idx_vulnerability_logs_base_url ON vulnerability_logs(base_url);
+CREATE INDEX idx_vulnerability_logs_vulnerability_type ON vulnerability_logs(vulnerability_type);
+CREATE INDEX idx_vulnerability_logs_timestamp ON vulnerability_logs(timestamp DESC);
+```
+
+### 2. Supabase Client (`lib/supabase.ts`)
+
+```typescript
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+export interface VulnerabilityLog {
+  id?: string;
+  base_url: string;
+  vulnerability_type: string;
+  technique_id: string;
+  timestamp?: string;
+  attacker_id: string;
+  session_id: string;
+}
+```
+
+---
+
+## IMPLEMENTATION DETAILS
+
+### 1. Honeypot Configuration (`lib/honeypot-config.ts`)
+
+```typescript
+export const HONEYPOT_CONFIG = {
+  apiKey: 'sk_afsldkfjslkjdfghsoiearhgf',  // Intentionally exposed
+  baseUrl: '/api/admin',
+} as const;
+```
+
+### 2. API Key Checking (`lib/honeypot-utils.ts`)
+
+```typescript
+export type ApiKeyCheckResult =
+  | { status: 'correct'; apiKey: string; header: string }
+  | { status: 'wrong'; apiKey: string; header: string }
+  | { status: 'none' };
+
+export function checkApiKey(headers: Headers): ApiKeyCheckResult {
+  for (const [key, value] of headers.entries()) {
+    if (value.includes('sk_') || key.toLowerCase().includes('api')) {
+      if (value === HONEYPOT_CONFIG.apiKey) {
+        return { status: 'correct', apiKey: value, header: key };
+      }
+      return { status: 'wrong', apiKey: value, header: key };
+    }
+  }
+  return { status: 'none' };
+}
+```
+
+### 3. Logging Function (`lib/honeypot-utils.ts`)
+
+```typescript
+export async function logHoneypotTrigger(
+  result: ApiKeyCheckResult,
+  request: Request,
+  route?: string
+) {
+  const url = new URL(request.url);
+  
+  const vulnerabilityType =
+    result.status === 'none'
+      ? 'admin-page-access-no-api-key'
+      : result.status === 'correct'
+      ? 'admin-page-access-correct-api-key'
+      : 'admin-page-access-incorrect-api-key';
+
+  const attackerId =
+    request.headers.get('x-forwarded-for')?.split(',')[0] ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+
+  const sessionId = `${attackerId}_${Date.now()}`;
+
+  const techniqueId = 
+    vulnerabilityType === 'admin-page-access-correct-api-key' ? 'T1552' :
+    vulnerabilityType === 'admin-page-access-incorrect-api-key' ? 'T1110' :
+    'T1190';
+
+  const payload = {
+    base_url: url.origin,
+    vulnerability_type: vulnerabilityType,
+    technique_id: techniqueId,
+    attacker_id: attackerId,
+    session_id: sessionId,
+  };
+
+  try {
+    const { error } = await supabase
+      .from('vulnerability_logs')
+      .insert(payload);
+
+    if (error) {
+      console.error('[Honeypot] Failed to log:', error);
+    }
+  } catch (err) {
+    console.error('[Honeypot] Exception:', err);
+  }
+}
+```
+
+### 4. Catch-All API Route (`app/api/[...slug]/route.ts`)
+
+```typescript
+import { NextResponse } from 'next/server';
+import { checkApiKey, logHoneypotTrigger } from '@/lib/honeypot-utils';
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ slug: string[] }> }
+) {
+  const { slug } = await params;
+  const result = checkApiKey(request.headers);
+  const path = '/api/' + slug.join('/');
+
+  logHoneypotTrigger(result, request, path);
+
+  if (result.status === 'correct') {
+    return NextResponse.json({ success: true, path, authenticated: true });
+  }
+
+  if (result.status === 'wrong') {
+    return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+  }
+
+  return NextResponse.json({ error: 'API key required' }, { status: 401 });
+}
+
+// Also implement POST, PUT, PATCH, DELETE handlers
+```
+
+### 5. Expose API Key in Frontend
+
+**In `app/page.tsx` (Server Component):**
+```typescript
+import { HONEYPOT_CONFIG } from '@/lib/honeypot-config';
+
+export default async function Home() {
+  const data = await getData();
+  return (
+    <main>
+      <Navbar apiKey={data.key} apiBaseUrl={data.api.baseUrl} />
+      {/* Rest of page */}
+    </main>
+  );
+}
+```
+
+**In `app/components/Navbar.tsx`:**
+```typescript
+// Method 1: Expose in JavaScript
+const apiKey = props.apiKey; // Visible in client bundle
+
+// Method 2: Expose in HTML data attribute
+<nav data-api-key={apiKey}>
+
+// Method 3: Use in client-side code
+'use client';
+export default function Navbar({ apiKey }) {
+  // API key is in props, visible in React DevTools and source
+  return <nav>...</nav>;
+}
+```
+
+---
+
+## TESTING
+
+### 1. Test API Key Exposure
+- View page source - API key should be visible
+- Check React DevTools - API key in props
+- Inspect HTML - API key in data attributes
+
+### 2. Test Logging
+- Access `/api/admin/test` without API key → logs "no-api-key"
+- Access with wrong API key → logs "incorrect-api-key"
+- Access with correct API key → logs "correct-api-key"
+
+### 3. Verify Supabase Logs
+```sql
+SELECT * FROM vulnerability_logs 
+WHERE vulnerability_type LIKE 'admin-page-access%'
+ORDER BY timestamp DESC;
+```
+
+---
+
+## SECURITY NOTES
+
+⚠️ **This code is intentionally vulnerable for honeypot purposes.**
+- DO NOT use this pattern in production
+- API keys should NEVER be exposed client-side
+- Always use environment variables for sensitive data
+- Implement proper authentication and authorization
+
+---
+
+## DEPLOYMENT
+
+1. Set environment variables in your hosting platform
+2. Run database migrations in Supabase
+3. Deploy Next.js app
+4. Monitor `vulnerability_logs` table for attack attempts
+
