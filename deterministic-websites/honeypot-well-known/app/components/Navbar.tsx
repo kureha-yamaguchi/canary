@@ -1,14 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import LoginButton from './LoginButton';
 
-interface NavbarProps {
-  apiKey?: string;
-  apiBaseUrl?: string;
-}
-
-export default function Navbar({ apiKey, apiBaseUrl }: NavbarProps) {
+export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -66,9 +60,6 @@ export default function Navbar({ apiKey, apiBaseUrl }: NavbarProps) {
             >
               Apply Now
             </a>
-            {apiKey && apiBaseUrl && (
-              <LoginButton apiKey={apiKey} apiBaseUrl={apiBaseUrl} />
-            )}
           </div>
         </div>
       </div>

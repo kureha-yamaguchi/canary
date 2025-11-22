@@ -1,29 +1,17 @@
 import Navbar from './components/Navbar';
 import AnimatedCounter from './components/AnimatedCounter';
-import { HONEYPOT_CONFIG } from '@/lib/honeypot-config';
 
-// Async function to fetch server-side data
-async function getData() {
-  // Simulate a static object return (could be from DB, API, etc.)
-  return {
-    key: HONEYPOT_CONFIG.apiKey,
-    api: {
-      baseUrl: HONEYPOT_CONFIG.baseUrl,
-    },
-    // Event data for display
+export default async function Home() {
+  const data = {
     attendees: 70,
     globalBuilders: 1000,
     prizePool: 10000,
     apiCredits: 400,
   };
-}
 
-export default async function Home() {
-  // Fetch data on the server
-  const data = await getData();
   return (
     <main className="bg-slate-950 text-white">
-      <Navbar apiKey={data.key} apiBaseUrl={`${data.api.baseUrl}`} />
+      <Navbar />
 
       {/* Hero Section */}
       <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden">
