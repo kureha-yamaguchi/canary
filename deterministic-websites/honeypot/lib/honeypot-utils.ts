@@ -1,4 +1,5 @@
 import { HONEYPOT_CONFIG } from './honeypot-config';
+import { supabase } from './supabase';
 
 export type ApiKeyCheckResult =
   | { status: 'correct'; apiKey: string; header: string }
@@ -36,9 +37,9 @@ export function checkApiKey(headers: Headers): ApiKeyCheckResult {
 }
 
 /**
- * Log honeypot trigger to console with details
+ * Log honeypot trigger to Supabase database
  */
-export function logHoneypotTrigger(
+export async function logHoneypotTrigger(
   result: ApiKeyCheckResult,
   request: Request,
   route?: string
@@ -46,17 +47,34 @@ export function logHoneypotTrigger(
   const url = new URL(request.url);
   const path = route || url.pathname;
 
-  const level =
+  // Map the result status to specific vulnerability types
+  const vulnerabilityType =
     result.status === 'none'
-      ? 'no-api-key'
+      ? 'admin-page-access-no-api-key'
       : result.status === 'correct'
-      ? 'api-key-correct'
-      : 'api-key-wrong';
+      ? 'admin-page-access-correct-api-key'
+      : 'admin-page-access-incorrect-api-key';
 
-  const logObject = {
-    level,
-    route: path,
-  };
+  // Extract attack_id (IP address or other identifier)
+  const attackId =
+    request.headers.get('x-forwarded-for') ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
 
-  console.log(logObject);
+  try {
+    const { error } = await supabase
+      .from('vulnerability_logs')
+      .insert({
+        base_url: url.origin,
+        path: path,
+        vulnerability_type: vulnerabilityType,
+        attack_id: attackId,
+      });
+
+    if (error) {
+      console.error('Failed to log to Supabase:', error);
+    }
+  } catch (err) {
+    console.error('Error logging honeypot trigger:', err);
+  }
 }
