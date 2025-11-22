@@ -1,0 +1,193 @@
+.matrix-container {
+  padding: 40px 24px;
+  max-width: 100%;
+  overflow-x: auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 100%);
+  min-height: 100vh;
+}
+
+.matrix-header {
+  max-width: 1200px;
+  margin: 0 auto 40px;
+}
+
+.matrix-title {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #1a1a1a;
+  letter-spacing: -0.8px;
+  line-height: 1.2;
+}
+
+.matrix-title::after {
+  content: '';
+  display: block;
+  width: 80px;
+  height: 4px;
+  background: linear-gradient(90deg, #0066cc 0%, #004499 100%);
+  margin-top: 16px;
+  border-radius: 2px;
+}
+
+.matrix-subtitle {
+  font-size: 15px;
+  color: #666;
+  line-height: 1.6;
+  margin-top: 8px;
+  max-width: 800px;
+}
+
+.matrix-table {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+}
+
+.matrix-table table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #fff;
+}
+
+.matrix-table thead {
+  background: linear-gradient(to bottom, #f8f9fa 0%, #f0f2f5 100%);
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.tactic-header {
+  padding: 16px 20px;
+  text-align: left;
+  border-right: 1px solid #e8e8e8;
+  vertical-align: top;
+  min-width: 220px;
+  background: linear-gradient(to bottom, #f8f9fa 0%, #f0f2f5 100%);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.tactic-header:first-child {
+  border-left: none;
+}
+
+.tactic-header:last-child {
+  border-right: none;
+}
+
+.tactic-header a {
+  color: #1a5490;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  display: block;
+  transition: color 0.2s ease;
+  line-height: 1.4;
+}
+
+.tactic-header a:hover {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+.tactic-column {
+  padding: 0;
+  border-right: 1px solid #e8e8e8;
+  vertical-align: top;
+  background-color: #fff;
+  width: 220px;
+}
+
+.tactic-column:last-child {
+  border-right: none;
+}
+
+.technique-cell {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 0;
+  transition: transform 0.1s ease;
+}
+
+.technique-cell:last-child {
+  border-bottom: none;
+}
+
+.technique-link {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: #2c3e50;
+  padding: 12px 16px;
+  transition: all 0.2s ease;
+  position: relative;
+  gap: 6px;
+}
+
+.technique-link::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.technique-link:hover {
+  background-color: #f8f9fa;
+  transform: translateX(2px);
+}
+
+.technique-link:hover::before {
+  background-color: #0066cc;
+}
+
+.technique-id {
+  display: block;
+  font-weight: 400;
+  color: #666;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+  letter-spacing: 0.3px;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+}
+
+.technique-link:hover .technique-id {
+  color: #999;
+}
+
+.technique-name {
+  display: block;
+  font-size: 13px;
+  color: #0066cc;
+  line-height: 1.4;
+  font-weight: 600;
+  background-color: #e8f0f8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.technique-link:hover .technique-name {
+  background-color: #0066cc;
+  color: #fff;
+}
+
+.loading-message,
+.error-message {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 18px;
+  color: #666;
+}
+
+.error-message {
+  color: #d32f2f;
+}
