@@ -34,6 +34,10 @@ def export_vulnerability_logs_to_csv(
 ) -> None:
     df = pd.DataFrame(logs)
 
+    # Filter to only include technique_ids that start with 'T'
+    if 'technique_id' in df.columns:
+        df = df[df['technique_id'].str.startswith('T', na=False)]
+
     # Ensure proper column order
     columns = [
         "id",
