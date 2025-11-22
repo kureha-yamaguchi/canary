@@ -103,12 +103,12 @@ export function AttackFilters({ attacks, stats, onFilterChange }: AttackFiltersP
   }
 
   return (
-    <div className="bg-slate-800 rounded-lg shadow-lg p-6 mb-6">
+    <div className="bg-white rounded-lg shadow-sm p-6 mb-6 border border-gray-200">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xl font-bold text-white">Filter & Search Attacks</h3>
+        <h3 className="text-xl font-bold text-gray-900">Filter & Search Attacks</h3>
         <button
           onClick={clearFilters}
-          className="text-sm text-slate-400 hover:text-white transition-colors"
+          className="text-sm text-gray-600 hover:text-gray-900 transition-colors font-medium"
         >
           Clear All
         </button>
@@ -117,7 +117,7 @@ export function AttackFilters({ attacks, stats, onFilterChange }: AttackFiltersP
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Search */}
         <div className="lg:col-span-3">
-          <label className="block text-sm text-slate-400 mb-2">Search</label>
+          <label className="block text-sm text-gray-700 mb-2 font-medium">Search</label>
           <input
             type="text"
             value={searchTerm}
@@ -126,20 +126,20 @@ export function AttackFilters({ attacks, stats, onFilterChange }: AttackFiltersP
               applyFilters()
             }}
             placeholder="Search by URL, IP, vulnerability, technique, session ID..."
-            className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+            className="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
           />
         </div>
 
         {/* Success Filter */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Status</label>
+          <label className="block text-sm text-gray-700 mb-2 font-medium">Status</label>
           <select
             value={successFilter}
             onChange={(e) => {
               setSuccessFilter(e.target.value as 'all' | 'success' | 'failed')
               applyFilters()
             }}
-            className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+            className="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
           >
             <option value="all">All Attacks</option>
             <option value="success">Successful Only</option>
@@ -149,14 +149,14 @@ export function AttackFilters({ attacks, stats, onFilterChange }: AttackFiltersP
 
         {/* Date Range */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Time Range</label>
+          <label className="block text-sm text-gray-700 mb-2 font-medium">Time Range</label>
           <select
             value={dateRange}
             onChange={(e) => {
               setDateRange(e.target.value as 'all' | '24h' | '7d' | '30d')
               applyFilters()
             }}
-            className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+            className="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
           >
             <option value="all">All Time</option>
             <option value="24h">Last 24 Hours</option>
@@ -167,14 +167,14 @@ export function AttackFilters({ attacks, stats, onFilterChange }: AttackFiltersP
 
         {/* Website Filter */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Website</label>
+          <label className="block text-sm text-gray-700 mb-2 font-medium">Website</label>
           <select
             value={selectedWebsite}
             onChange={(e) => {
               setSelectedWebsite(e.target.value)
               applyFilters()
             }}
-            className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+            className="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
           >
             <option value="">All Websites</option>
             {stats.websites.map(url => (
@@ -185,14 +185,14 @@ export function AttackFilters({ attacks, stats, onFilterChange }: AttackFiltersP
 
         {/* Vulnerability Filter */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Vulnerability Type</label>
+          <label className="block text-sm text-gray-700 mb-2 font-medium">Vulnerability Type</label>
           <select
             value={selectedVulnerability}
             onChange={(e) => {
               setSelectedVulnerability(e.target.value)
               applyFilters()
             }}
-            className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+            className="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
           >
             <option value="">All Vulnerabilities</option>
             {stats.vulnerabilities.map(vuln => (
@@ -203,14 +203,14 @@ export function AttackFilters({ attacks, stats, onFilterChange }: AttackFiltersP
 
         {/* Technique Filter */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">MITRE Technique</label>
+          <label className="block text-sm text-gray-700 mb-2 font-medium">MITRE Technique</label>
           <select
             value={selectedTechnique}
             onChange={(e) => {
               setSelectedTechnique(e.target.value)
               applyFilters()
             }}
-            className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+            className="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
           >
             <option value="">All Techniques</option>
             {stats.techniques.map(tech => (
@@ -221,14 +221,14 @@ export function AttackFilters({ attacks, stats, onFilterChange }: AttackFiltersP
 
         {/* IP Filter */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Source IP</label>
+          <label className="block text-sm text-gray-700 mb-2 font-medium">Source IP</label>
           <select
             value={selectedIp}
             onChange={(e) => {
               setSelectedIp(e.target.value)
               applyFilters()
             }}
-            className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+            className="w-full px-4 py-2 bg-white text-gray-900 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none"
           >
             <option value="">All IPs</option>
             {stats.ips.map(ip => (

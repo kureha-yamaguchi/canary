@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { LiveAttacksPage } from './pages/LiveAttacksPage'
-import { RiskAnalysisPage } from './pages/RiskAnalysisPage'
 import { AttackDetailsPage } from './pages/AttackDetailsPage'
 import { SessionViewPage } from './pages/SessionViewPage'
+import { MatrixMapPage } from './pages/MatrixMapPage'
 
 function App() {
   return (
@@ -11,7 +11,7 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<LiveAttacksPage />} />
-          <Route path="/risk-analysis" element={<RiskAnalysisPage />} />
+          <Route path="/matrix-map" element={<MatrixMapPage />} />
           <Route path="/attack/:attackId" element={<AttackDetailsPage />} />
           <Route path="/session/:sessionId" element={<SessionViewPage />} />
         </Routes>
