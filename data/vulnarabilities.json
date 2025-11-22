@@ -1,0 +1,807 @@
+{
+    "vulnerabilities": [
+      {
+        "id": 1,
+        "name": "SQL Injection",
+        "description": "User input concatenated directly into SQL queries without sanitization",
+        "stack": [
+          "database connection",
+          "input from user",
+          "backend query execution"
+        ],
+        "detection": "Monitor database logs for queries containing SQL metacharacters (', --, UNION, OR 1=1); track abnormal query patterns or failed authentication bypasses; log queries returning unexpected row counts",
+        "mitre_attack": {
+          "technique_id": "T1190",
+          "technique_name": "Exploit Public-Facing Application",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1190/"
+        }
+      },
+      {
+        "id": 2,
+        "name": "Cross-Site Scripting (XSS) - Reflected",
+        "description": "User input echoed back to page without HTML encoding",
+        "stack": [
+          "html",
+          "input from user",
+          "text display"
+        ],
+        "detection": "Log inputs containing <script>, onerror=, javascript:, or other script-related strings; monitor for requests to honeypot endpoints embedded in XSS payloads; track Content-Security-Policy violations",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      },
+      {
+        "id": 3,
+        "name": "Cross-Site Scripting (XSS) - Stored",
+        "description": "Malicious scripts saved to database and displayed to other users",
+        "stack": [
+          "html",
+          "input from user",
+          "database connection",
+          "text display"
+        ],
+        "detection": "Scan database entries for script tags or JavaScript; monitor for sudden spikes in page load errors; track users viewing content that triggers CSP violations",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      },
+      {
+        "id": 4,
+        "name": "Insecure Direct Object References (IDOR)",
+        "description": "Sequential or guessable IDs expose unauthorized resources",
+        "stack": [
+          "url parameters",
+          "database connection",
+          "backend routing"
+        ],
+        "detection": "Track users accessing resource IDs outside their normal range; monitor rapid sequential ID requests; log access to honeypot resources with attractive IDs",
+        "mitre_attack": {
+          "technique_id": "T1098",
+          "technique_name": "Account Manipulation",
+          "tactic": "Persistence",
+          "url": "https://attack.mitre.org/techniques/T1098/"
+        }
+      },
+      {
+        "id": 5,
+        "name": "Broken Authentication",
+        "description": "Missing or weak session management",
+        "stack": [
+          "session management",
+          "cookies",
+          "backend authentication"
+        ],
+        "detection": "Monitor for session tokens being reused across different IPs; track login success without proper credentials; log access after session should have expired",
+        "mitre_attack": {
+          "technique_id": "T1550",
+          "technique_name": "Use Alternate Authentication Material",
+          "tactic": "Defense Evasion, Lateral Movement",
+          "url": "https://attack.mitre.org/techniques/T1550/"
+        }
+      },
+      {
+        "id": 6,
+        "name": "Missing Access Control",
+        "description": "No authorization checks on sensitive endpoints",
+        "stack": [
+          "url routing",
+          "backend routing",
+          "session management"
+        ],
+        "detection": "Log direct URL access to admin pages without prior authentication; track users accessing endpoints above their privilege level; monitor referrer headers for missing navigation flows",
+        "mitre_attack": {
+          "technique_id": "T1078",
+          "technique_name": "Valid Accounts",
+          "tactic": "Defense Evasion, Persistence, Privilege Escalation, Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1078/"
+        }
+      },
+      {
+        "id": 7,
+        "name": "Cross-Site Request Forgery (CSRF)",
+        "description": "Sensitive actions lack anti-CSRF tokens",
+        "stack": [
+          "html form",
+          "button",
+          "backend form processing"
+        ],
+        "detection": "Monitor POST requests with external referrer headers; track identical requests from multiple IPs; log state-changing actions without CSRF tokens",
+        "mitre_attack": {
+          "technique_id": "T1539",
+          "technique_name": "Steal Web Session Cookie",
+          "tactic": "Credential Access",
+          "url": "https://attack.mitre.org/techniques/T1539/"
+        }
+      },
+      {
+        "id": 8,
+        "name": "Sensitive Data Exposure - Client Side",
+        "description": "API keys or secrets visible in JavaScript/HTML",
+        "stack": [
+          "html",
+          "javascript",
+          "html comments"
+        ],
+        "detection": "Monitor for requests using honeypot API keys embedded in code; track access attempts to fake credentials; log DevTools opening events",
+        "mitre_attack": {
+          "technique_id": "T1552.001",
+          "technique_name": "Unsecured Credentials: Credentials In Files",
+          "tactic": "Credential Access",
+          "url": "https://attack.mitre.org/techniques/T1552/001/"
+        }
+      },
+      {
+        "id": 9,
+        "name": "XML External Entity (XXE)",
+        "description": "XML parser processes external entity references",
+        "stack": [
+          "xml parser",
+          "input from user",
+          "file system access"
+        ],
+        "detection": "Monitor for file access attempts to /etc/passwd or C:\\windows\\win.ini; track unusual outbound connections during XML processing; log XML inputs containing <!ENTITY or SYSTEM keywords",
+        "mitre_attack": {
+          "technique_id": "T1190",
+          "technique_name": "Exploit Public-Facing Application",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1190/"
+        }
+      },
+      {
+        "id": 10,
+        "name": "Insecure Deserialization",
+        "description": "Untrusted data deserialized without validation",
+        "stack": [
+          "cookies",
+          "backend deserialization",
+          "session management"
+        ],
+        "detection": "Monitor for serialized objects in cookies or parameters; track unexpected code execution or file creation; log deserialization errors or type mismatches",
+        "mitre_attack": {
+          "technique_id": "T1203",
+          "technique_name": "Exploitation for Client Execution",
+          "tactic": "Execution",
+          "url": "https://attack.mitre.org/techniques/T1203/"
+        }
+      },
+      {
+        "id": 11,
+        "name": "Server-Side Request Forgery (SSRF)",
+        "description": "Application fetches user-supplied URLs without validation",
+        "stack": [
+          "input from user",
+          "backend http client",
+          "url parameters"
+        ],
+        "detection": "Monitor requests to internal IP ranges (127.0.0.1, 192.168.x.x, 169.254.x.x); track access to cloud metadata endpoints (169.254.169.254); log failed internal service connections",
+        "mitre_attack": {
+          "technique_id": "T1190",
+          "technique_name": "Exploit Public-Facing Application",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1190/"
+        }
+      },
+      {
+        "id": 12,
+        "name": "Path Traversal",
+        "description": "File paths constructed from user input allow directory navigation",
+        "stack": [
+          "input from user",
+          "file system access",
+          "url parameters"
+        ],
+        "detection": "Log file access requests containing ../, ..\\, or absolute paths; monitor reads of sensitive files (/etc/passwd, web.config); track access attempts to honeypot files in parent directories",
+        "mitre_attack": {
+          "technique_id": "T1083",
+          "technique_name": "File and Directory Discovery",
+          "tactic": "Discovery",
+          "url": "https://attack.mitre.org/techniques/T1083/"
+        }
+      },
+      {
+        "id": 13,
+        "name": "Local File Inclusion (LFI)",
+        "description": "Application includes files based on unvalidated user input",
+        "stack": [
+          "input from user",
+          "file system access",
+          "backend file inclusion"
+        ],
+        "detection": "Monitor includes containing ../ or absolute paths; track access to system files through file parameter; log unusual file extensions in include parameters",
+        "mitre_attack": {
+          "technique_id": "T1005",
+          "technique_name": "Data from Local System",
+          "tactic": "Collection",
+          "url": "https://attack.mitre.org/techniques/T1005/"
+        }
+      },
+      {
+        "id": 14,
+        "name": "Remote File Inclusion (RFI)",
+        "description": "Application includes files from remote URLs",
+        "stack": [
+          "input from user",
+          "backend http client",
+          "backend file inclusion"
+        ],
+        "detection": "Track include parameters containing http://, ftp://, or external domains; monitor outbound connections during page rendering; log includes from suspicious domains",
+        "mitre_attack": {
+          "technique_id": "T1105",
+          "technique_name": "Ingress Tool Transfer",
+          "tactic": "Command and Control",
+          "url": "https://attack.mitre.org/techniques/T1105/"
+        }
+      },
+      {
+        "id": 15,
+        "name": "Command Injection",
+        "description": "User input passed to system shell commands",
+        "stack": [
+          "input from user",
+          "backend command execution",
+          "operating system shell"
+        ],
+        "detection": "Log inputs containing shell metacharacters (;, |, &, $, `, ||, &&); monitor unexpected child processes; track file system changes or network connections during request processing",
+        "mitre_attack": {
+          "technique_id": "T1059",
+          "technique_name": "Command and Scripting Interpreter",
+          "tactic": "Execution",
+          "url": "https://attack.mitre.org/techniques/T1059/"
+        }
+      },
+      {
+        "id": 16,
+        "name": "LDAP Injection",
+        "description": "User input in LDAP queries without sanitization",
+        "stack": [
+          "input from user",
+          "ldap connection",
+          "backend authentication"
+        ],
+        "detection": "Monitor LDAP queries containing *, ), (, |, &; track successful authentication with malformed usernames; log access to unexpected directory entries",
+        "mitre_attack": {
+          "technique_id": "T1190",
+          "technique_name": "Exploit Public-Facing Application",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1190/"
+        }
+      },
+      {
+        "id": 17,
+        "name": "Row Level Security Bypass",
+        "description": "Multi-tenant data accessed without tenant filtering",
+        "stack": [
+          "database connection",
+          "backend query execution",
+          "session management"
+        ],
+        "detection": "Track users accessing records from multiple tenant IDs; monitor queries missing tenant filters; log access to honeypot records from other organizations",
+        "mitre_attack": {
+          "technique_id": "T1530",
+          "technique_name": "Data from Cloud Storage",
+          "tactic": "Collection",
+          "url": "https://attack.mitre.org/techniques/T1530/"
+        }
+      },
+      {
+        "id": 18,
+        "name": "Mass Assignment",
+        "description": "Bulk property updates without field whitelisting",
+        "stack": [
+          "html form",
+          "input from user",
+          "backend orm",
+          "database connection"
+        ],
+        "detection": "Monitor for unexpected parameter names (isAdmin, role, permissions); track privilege escalations; log updates to protected fields",
+        "mitre_attack": {
+          "technique_id": "T1098",
+          "technique_name": "Account Manipulation",
+          "tactic": "Persistence",
+          "url": "https://attack.mitre.org/techniques/T1098/"
+        }
+      },
+      {
+        "id": 19,
+        "name": "Insufficient Rate Limiting",
+        "description": "No throttling on sensitive endpoints",
+        "stack": [
+          "backend routing",
+          "backend authentication",
+          "api endpoint"
+        ],
+        "detection": "Track requests per user/IP exceeding normal thresholds; monitor rapid-fire login attempts; log brute force patterns",
+        "mitre_attack": {
+          "technique_id": "T1110",
+          "technique_name": "Brute Force",
+          "tactic": "Credential Access",
+          "url": "https://attack.mitre.org/techniques/T1110/"
+        }
+      },
+      {
+        "id": 20,
+        "name": "Open Redirect",
+        "description": "Redirect URLs taken from unvalidated user input",
+        "stack": [
+          "url parameters",
+          "backend redirect",
+          "input from user"
+        ],
+        "detection": "Monitor redirect parameters containing external domains; track redirects to known phishing sites; log redirects outside your domain",
+        "mitre_attack": {
+          "technique_id": "T1566.002",
+          "technique_name": "Phishing: Spearphishing Link",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1566/002/"
+        }
+      },
+      {
+        "id": 21,
+        "name": "Clickjacking",
+        "description": "Missing X-Frame-Options or CSP frame-ancestors headers",
+        "stack": [
+          "html",
+          "http headers",
+          "iframe"
+        ],
+        "detection": "Monitor for your pages loaded in iframes from external domains; track unexpected referrers; use JavaScript to detect frame embedding attempts",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      },
+      {
+        "id": 22,
+        "name": "Weak Password Policy",
+        "description": "No complexity or length requirements",
+        "stack": [
+          "html form",
+          "input from user",
+          "backend authentication",
+          "database connection"
+        ],
+        "detection": "Log passwords matching common weak password lists; track accounts created with short passwords; monitor password reuse across accounts",
+        "mitre_attack": {
+          "technique_id": "T1110.001",
+          "technique_name": "Brute Force: Password Guessing",
+          "tactic": "Credential Access",
+          "url": "https://attack.mitre.org/techniques/T1110/001/"
+        }
+      },
+      {
+        "id": 23,
+        "name": "Missing Security Headers",
+        "description": "Absent HSTS, CSP, X-Content-Type-Options headers",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Monitor for mixed content errors; track protocol downgrade attempts; log browsers connecting without HSTS",
+        "mitre_attack": {
+          "technique_id": "T1557",
+          "technique_name": "Adversary-in-the-Middle",
+          "tactic": "Credential Access, Collection",
+          "url": "https://attack.mitre.org/techniques/T1557/"
+        }
+      },
+      {
+        "id": 24,
+        "name": "Insecure File Upload",
+        "description": "No validation of uploaded file types or content",
+        "stack": [
+          "html form",
+          "file upload",
+          "backend file handling",
+          "file system access"
+        ],
+        "detection": "Track uploads with executable extensions (.php, .jsp, .exe); monitor file uploads to web-accessible directories; log suspicious MIME types",
+        "mitre_attack": {
+          "technique_id": "T1204.002",
+          "technique_name": "User Execution: Malicious File",
+          "tactic": "Execution",
+          "url": "https://attack.mitre.org/techniques/T1204/002/"
+        }
+      },
+      {
+        "id": 25,
+        "name": "Directory Listing Enabled",
+        "description": "Web server shows directory contents",
+        "stack": [
+          "web server configuration",
+          "file system access"
+        ],
+        "detection": "Monitor access to directories without index files; track requests returning 200 with directory listings; log honeypot directory accesses",
+        "mitre_attack": {
+          "technique_id": "T1083",
+          "technique_name": "File and Directory Discovery",
+          "tactic": "Discovery",
+          "url": "https://attack.mitre.org/techniques/T1083/"
+        }
+      },
+      {
+        "id": 26,
+        "name": "Information Disclosure in Errors",
+        "description": "Verbose error messages reveal stack traces or database details",
+        "stack": [
+          "backend error handling",
+          "html",
+          "database connection"
+        ],
+        "detection": "Monitor for error pages containing SQL errors, file paths, or stack traces; track 500 errors visible to users; log debug mode enabled in production",
+        "mitre_attack": {
+          "technique_id": "T1592",
+          "technique_name": "Gather Victim Host Information",
+          "tactic": "Reconnaissance",
+          "url": "https://attack.mitre.org/techniques/T1592/"
+        }
+      },
+      {
+        "id": 27,
+        "name": "Unvalidated Redirects in Authentication",
+        "description": "Login redirect parameter exploited for phishing",
+        "stack": [
+          "backend authentication",
+          "url parameters",
+          "backend redirect"
+        ],
+        "detection": "Track redirect parameters in login requests; monitor post-authentication redirects to external domains; log suspicious redirect patterns",
+        "mitre_attack": {
+          "technique_id": "T1566.002",
+          "technique_name": "Phishing: Spearphishing Link",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1566/002/"
+        }
+      },
+      {
+        "id": 28,
+        "name": "Cookie Security Issues",
+        "description": "Missing Secure, HttpOnly, or SameSite flags",
+        "stack": [
+          "cookies",
+          "http headers",
+          "session management"
+        ],
+        "detection": "Monitor cookies transmitted over HTTP; track cookies accessible via JavaScript when they shouldn't be; log cross-site cookie usage",
+        "mitre_attack": {
+          "technique_id": "T1539",
+          "technique_name": "Steal Web Session Cookie",
+          "tactic": "Credential Access",
+          "url": "https://attack.mitre.org/techniques/T1539/"
+        }
+      },
+      {
+        "id": 29,
+        "name": "API Key in URL Parameters",
+        "description": "Authentication credentials passed in GET requests",
+        "stack": [
+          "url parameters",
+          "api endpoint",
+          "backend authentication"
+        ],
+        "detection": "Scan access logs for API keys in URLs; monitor for keys appearing in browser history or referrer headers; track key reuse across IPs",
+        "mitre_attack": {
+          "technique_id": "T1552.001",
+          "technique_name": "Unsecured Credentials: Credentials In Files",
+          "tactic": "Credential Access",
+          "url": "https://attack.mitre.org/techniques/T1552/001/"
+        }
+      },
+      {
+        "id": 30,
+        "name": "NoSQL Injection",
+        "description": "Unvalidated input in NoSQL queries (MongoDB, etc.)",
+        "stack": [
+          "input from user",
+          "nosql database",
+          "backend query execution"
+        ],
+        "detection": "Monitor queries containing $where, $ne, $gt operators from user input; track authentication bypasses using operator injection; log unusual query patterns or regex injections",
+        "mitre_attack": {
+          "technique_id": "T1190",
+          "technique_name": "Exploit Public-Facing Application",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1190/"
+        }
+      },
+      {
+        "id": 31,
+        "name": "HTTPS Not Enabled",
+        "description": "Website served over HTTP instead of HTTPS",
+        "stack": [
+          "web server configuration",
+          "http protocol"
+        ],
+        "detection": "Monitor connections on port 80; track HTTP requests without redirection to HTTPS; log unencrypted traffic",
+        "mitre_attack": {
+          "technique_id": "T1040",
+          "technique_name": "Network Sniffing",
+          "tactic": "Credential Access, Discovery",
+          "url": "https://attack.mitre.org/techniques/T1040/"
+        }
+      },
+      {
+        "id": 32,
+        "name": "Missing Content Security Policy (CSP)",
+        "description": "No Content-Security-Policy header to prevent XSS and injection attacks",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan HTTP response headers for missing Content-Security-Policy; monitor XSS attempts that would be blocked by CSP; track inline script execution",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      },
+      {
+        "id": 33,
+        "name": "Certificate Expiry",
+        "description": "TLS/SSL certificate is expired or expiring soon",
+        "stack": [
+          "tls certificate",
+          "web server configuration"
+        ],
+        "detection": "Monitor certificate expiration dates; track certificate validity periods; log certificates expiring within 30 days; alert on expired certificates",
+        "mitre_attack": {
+          "technique_id": "T1557.002",
+          "technique_name": "Adversary-in-the-Middle: ARP Cache Poisoning",
+          "tactic": "Credential Access, Collection",
+          "url": "https://attack.mitre.org/techniques/T1557/002/"
+        }
+      },
+      {
+        "id": 34,
+        "name": "Mixed Content",
+        "description": "HTTPS page loading HTTP resources (scripts, images, stylesheets)",
+        "stack": [
+          "html",
+          "http protocol",
+          "resource loading"
+        ],
+        "detection": "Monitor browser console for mixed content warnings; track HTTP resources loaded on HTTPS pages; log insecure resource requests",
+        "mitre_attack": {
+          "technique_id": "T1557",
+          "technique_name": "Adversary-in-the-Middle",
+          "tactic": "Credential Access, Collection",
+          "url": "https://attack.mitre.org/techniques/T1557/"
+        }
+      },
+      {
+        "id": 35,
+        "name": "Outdated TLS Version",
+        "description": "Server supports only TLS 1.0 or 1.1 instead of TLS 1.2+",
+        "stack": [
+          "tls configuration",
+          "web server configuration"
+        ],
+        "detection": "Scan TLS handshakes for protocol version; monitor connections using TLS 1.0/1.1; track cipher suite negotiations; log outdated protocol usage",
+        "mitre_attack": {
+          "technique_id": "T1557",
+          "technique_name": "Adversary-in-the-Middle",
+          "tactic": "Credential Access, Collection",
+          "url": "https://attack.mitre.org/techniques/T1557/"
+        }
+      },
+      {
+        "id": 36,
+        "name": "Deprecated TLS Support",
+        "description": "Server still supports deprecated SSL 2.0/3.0 or TLS 1.0",
+        "stack": [
+          "tls configuration",
+          "web server configuration"
+        ],
+        "detection": "Test for SSL 2.0/3.0 and TLS 1.0 support; monitor deprecated protocol handshakes; log clients using obsolete protocols",
+        "mitre_attack": {
+          "technique_id": "T1557",
+          "technique_name": "Adversary-in-the-Middle",
+          "tactic": "Credential Access, Collection",
+          "url": "https://attack.mitre.org/techniques/T1557/"
+        }
+      },
+      {
+        "id": 37,
+        "name": "Weak Cipher Suite",
+        "description": "Server supports weak or export-grade cipher suites",
+        "stack": [
+          "tls configuration",
+          "web server configuration"
+        ],
+        "detection": "Scan supported cipher suites; monitor for NULL, EXPORT, DES, RC4, or MD5-based ciphers; track weak cipher negotiations; log cipher suite usage",
+        "mitre_attack": {
+          "technique_id": "T1557",
+          "technique_name": "Adversary-in-the-Middle",
+          "tactic": "Credential Access, Collection",
+          "url": "https://attack.mitre.org/techniques/T1557/"
+        }
+      },
+      {
+        "id": 38,
+        "name": "Missing HSTS Header",
+        "description": "HTTP Strict-Transport-Security header not set",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan HTTP response headers for missing Strict-Transport-Security; monitor HTTP connections that should be HTTPS; track protocol downgrade attempts",
+        "mitre_attack": {
+          "technique_id": "T1557",
+          "technique_name": "Adversary-in-the-Middle",
+          "tactic": "Credential Access, Collection",
+          "url": "https://attack.mitre.org/techniques/T1557/"
+        }
+      },
+      {
+        "id": 39,
+        "name": "Missing X-Frame-Options Header",
+        "description": "X-Frame-Options header not set, allowing clickjacking",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan HTTP response headers for missing X-Frame-Options; monitor pages loaded in iframes from external domains; track frame embedding attempts",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      },
+      {
+        "id": 40,
+        "name": "Missing X-Content-Type-Options Header",
+        "description": "X-Content-Type-Options header not set to 'nosniff'",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan HTTP response headers for missing X-Content-Type-Options; monitor MIME-type sniffing behavior; track content-type mismatches",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      },
+      {
+        "id": 41,
+        "name": "Missing Permissions-Policy Header",
+        "description": "Permissions-Policy (formerly Feature-Policy) header not set",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan HTTP response headers for missing Permissions-Policy; monitor access to browser features (camera, microphone, geolocation); track feature usage patterns",
+        "mitre_attack": {
+          "technique_id": "T1123",
+          "technique_name": "Audio Capture",
+          "tactic": "Collection",
+          "url": "https://attack.mitre.org/techniques/T1123/"
+        }
+      },
+      {
+        "id": 42,
+        "name": "Insecure Set-Cookie Headers",
+        "description": "Cookies set without Secure, HttpOnly, or SameSite attributes",
+        "stack": [
+          "http headers",
+          "cookies",
+          "session management"
+        ],
+        "detection": "Scan Set-Cookie headers for missing security flags; monitor cookies sent over HTTP; track cookies accessible via JavaScript; log cross-site cookie transmission",
+        "mitre_attack": {
+          "technique_id": "T1539",
+          "technique_name": "Steal Web Session Cookie",
+          "tactic": "Credential Access",
+          "url": "https://attack.mitre.org/techniques/T1539/"
+        }
+      },
+      {
+        "id": 43,
+        "name": "Missing Referrer Policy",
+        "description": "Referrer-Policy header not set or set to unsafe value",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan HTTP response headers for missing or weak Referrer-Policy; monitor referrer information leakage; track sensitive URLs in referrer headers",
+        "mitre_attack": {
+          "technique_id": "T1592",
+          "technique_name": "Gather Victim Host Information",
+          "tactic": "Reconnaissance",
+          "url": "https://attack.mitre.org/techniques/T1592/"
+        }
+      },
+      {
+        "id": 44,
+        "name": "Missing Content-Type Header",
+        "description": "Content-Type header not set or incorrectly configured",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan HTTP response headers for missing Content-Type; monitor MIME-type mismatches; track content served with incorrect types; log browser interpretation errors",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      },
+      {
+        "id": 45,
+        "name": "Lack of Trusted Types Readiness",
+        "description": "Application not prepared for Trusted Types enforcement",
+        "stack": [
+          "javascript",
+          "dom manipulation",
+          "csp configuration"
+        ],
+        "detection": "Monitor DOM-based XSS vulnerabilities; track usage of dangerous DOM sinks (innerHTML, eval); scan for CSP with require-trusted-types-for directive",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      },
+      {
+        "id": 46,
+        "name": "Missing Cross-Origin Resource Isolation",
+        "description": "Cross-Origin-Embedder-Policy and Cross-Origin-Opener-Policy headers not set",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan HTTP response headers for missing COEP and COOP; monitor cross-origin resource access; track Spectre-related timing attacks; log SharedArrayBuffer usage",
+        "mitre_attack": {
+          "technique_id": "T1005",
+          "technique_name": "Data from Local System",
+          "tactic": "Collection",
+          "url": "https://attack.mitre.org/techniques/T1005/"
+        }
+      },
+      {
+        "id": 47,
+        "name": "Server Information Disclosure",
+        "description": "Server header reveals server type and version information",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan Server header in HTTP responses; monitor for detailed version information (Apache/2.4.41, nginx/1.18.0); track banner information in responses",
+        "mitre_attack": {
+          "technique_id": "T1592.002",
+          "technique_name": "Gather Victim Host Information: Software",
+          "tactic": "Reconnaissance",
+          "url": "https://attack.mitre.org/techniques/T1592/002/"
+        }
+      },
+      {
+        "id": 48,
+        "name": "Deprecated X-XSS-Protection Header",
+        "description": "Using deprecated X-XSS-Protection header instead of CSP",
+        "stack": [
+          "http headers",
+          "web server configuration"
+        ],
+        "detection": "Scan for presence of X-XSS-Protection header; monitor for reliance on browser XSS filters; check for missing modern CSP implementation",
+        "mitre_attack": {
+          "technique_id": "T1189",
+          "technique_name": "Drive-by Compromise",
+          "tactic": "Initial Access",
+          "url": "https://attack.mitre.org/techniques/T1189/"
+        }
+      }
+    ]
+  }

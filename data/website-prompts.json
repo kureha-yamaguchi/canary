@@ -1,5 +1,5 @@
 {
-    "vulnerabilities": [
+    "website-prompts": [
       {
         "id": 1,
         "prompt": "Create a simple blog with user comments and a search function for CHAI (Concerningly Hot AI Institute), where researchers document server overheating incidents and cooling solutions. Researchers can comment on each incident report and search through the archive of thermal catastrophes.",
