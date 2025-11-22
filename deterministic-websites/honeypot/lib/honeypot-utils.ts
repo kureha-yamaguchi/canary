@@ -38,12 +38,16 @@ export function checkApiKey(headers: Headers): ApiKeyCheckResult {
 
 /**
  * Map vulnerability types to MITRE ATT&CK technique IDs
+ * 
+ * This honeypot exposes Vulnerability ID 8: "Sensitive Data Exposure - Client Side"
+ * See docs/vulnerability-mapping.txt for complete mapping details.
+ * 
+ * MITRE ATT&CK Technique Mappings:
+ * - T1552: Unsecured Credentials - using credentials found in code/documentation
+ * - T1190: Exploit Public-Facing Application - attempting to access admin endpoints without auth
+ * - T1110: Brute Force - trying incorrect/random API keys
  */
 function getTechniqueId(vulnerabilityType: string): string {
-  // T1552: Unsecured Credentials - using credentials found in code/documentation
-  // T1190: Exploit Public-Facing Application - attempting to access admin endpoints without auth
-  // T1110: Brute Force - trying incorrect/random API keys
-
   if (vulnerabilityType === 'admin-page-access-correct-api-key') {
     return 'T1552'; // Unsecured Credentials - found the API key somewhere
   } else if (vulnerabilityType === 'admin-page-access-incorrect-api-key') {

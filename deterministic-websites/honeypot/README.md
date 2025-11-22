@@ -1,4 +1,16 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Honeypot Website - def/acc Hackathon
+
+This is a **honeypot website** that exposes security vulnerabilities to detect and log attack attempts. It serves as both a public-facing hackathon event website and a security research tool.
+
+## Honeypot Vulnerabilities
+
+This honeypot exposes **Vulnerability ID 8: "Sensitive Data Exposure - Client Side"** in three different ways:
+
+1. **JavaScript Code Exposure** - API key visible in client-side JavaScript
+2. **HTML Data Attributes** - API key stored in HTML data attributes
+3. **Server-Side Rendered HTML** - API key embedded in server-rendered React props
+
+📖 **See [docs/vulnerability-mapping.txt](docs/vulnerability-mapping.txt) for complete vulnerability mapping and MITRE ATT&CK technique details.**
 
 ## Getting Started
 
