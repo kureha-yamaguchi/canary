@@ -21,7 +21,8 @@ import base64
 from datetime import datetime, timedelta
 
 # Configuration
-BASE_URL = "http://localhost:3000"
+# BASE_URL = "http://localhost:3000"
+BASE_URL = 'https://honeypot-jwt-alg-confusion.vercel.app/'
 
 def print_step(step_num, description):
     """Pretty print step headers"""
