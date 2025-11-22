@@ -18,7 +18,7 @@ function getSessionId(request: Request): string {
   return `${ip.split(',')[0]}_${timestamp}`;
 }
 
-async function logAttempt(
+async function logActiveScanningAttempt(
   request: Request,
   path: string,
   success?: boolean,
@@ -47,11 +47,7 @@ async function logAttempt(
 
 export function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
-
-  if (path !== '/') {
-    logAttempt(request, path);
-  }
-
+  logActiveScanningAttempt(request, path);
   // Let the request continue normally
   return NextResponse.next();
 }
