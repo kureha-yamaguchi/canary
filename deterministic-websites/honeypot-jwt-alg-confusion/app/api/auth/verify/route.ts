@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { logHoneypotTrigger } from '@/lib/supabase';
 
 // 🔥 TOGGLE VULNERABILITY HERE 🔥
@@ -24,30 +25,42 @@ export async function POST(request: NextRequest) {
 
     if (VULNERABLE_MODE) {
       // ⚠️ VULNERABLE: Accepts any algorithm
-      // An attacker can use HS256 with the public key as the secret
       try {
-        decoded = jwt.verify(token, publicKey, {
-          // No algorithm whitelist = vulnerable!
-          // If token uses HS256, it will treat publicKey as HMAC secret
-        });
-      } catch {
-        // If RS256 verification fails, try HS256 with public key as secret
-        // This simulates the algorithm confusion vulnerability
-        try {
-          decoded = jwt.verify(token, publicKey, {
-            algorithms: ['HS256', 'RS256']
-          });
+        if (algorithmUsed === 'HS256') {
+          // Manually verify HS256 using public key as HMAC secret
+          // This simulates the algorithm confusion vulnerability
+          const [headerB64, payloadB64, signatureB64] = token.split('.');
 
-          // If HS256 succeeded, this is definitely an attack
-          if (algorithmUsed === 'HS256') {
+          const message = `${headerB64}.${payloadB64}`;
+          const expectedSignature = crypto
+            .createHmac('sha256', publicKey)
+            .update(message)
+            .digest('base64url');
+
+          if (signatureB64 === expectedSignature) {
+            const payloadStr = Buffer.from(payloadB64, 'base64url').toString();
+            decoded = JSON.parse(payloadStr);
             isAttackAttempt = true;
+            console.log('✅ HS256 verification succeeded!');
+            console.log('✅ Decoded payload:', decoded);
+          } else {
+            console.log('❌ HS256 signature mismatch');
+            throw new Error('Invalid signature');
           }
-        } catch {
-          return NextResponse.json(
-            { error: 'Invalid token' },
-            { status: 401 }
-          );
+        } else {
+          console.log('🔍 Attempting RS256 verification...');
+          // Try RS256 verification for other algorithms
+          decoded = jwt.verify(token, publicKey, {
+            algorithms: ['RS256']
+          });
+          console.log('✅ RS256 verification succeeded');
         }
+      } catch (err) {
+        console.log('❌ Verification error:', err);
+        return NextResponse.json(
+          { error: 'Invalid token' },
+          { status: 401 }
+        );
       }
     } else {
       // ✅ SECURE: Only accepts RS256
@@ -65,6 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Log successful attack if HS256 was used
     if (isAttackAttempt || algorithmUsed === 'HS256') {
+      console.log('🚨 Logging attack to honeypot...');
       await logHoneypotTrigger({
         vulnerability_type: 'jwt_algorithm_confusion',
         base_url: process.env.VERCEL_PROJECT_PRODUCTION_URL ?? 'unknown',
@@ -74,10 +88,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       valid: true,
       decoded,
-      warning: isAttackAttempt ? 'Algorithm confusion detected!' : undefined
     });
 
-  } catch {
+  } catch (err) {
+    console.log('❌ Top-level error:', err);
     return NextResponse.json(
       { error: 'Verification failed' },
       { status: 500 }
