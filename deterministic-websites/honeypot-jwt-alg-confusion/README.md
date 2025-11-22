@@ -25,3 +25,7 @@ The `attack.py` script demonstrates a successful hack:
 ```
 uv run attack.py
 ```
+
+To add this vulnerability to another app:
+- Copy the `app/api/auth` routes into the app. These will add the vulnerable auth-related routes to the API.
+- Add a login to the frontend of the app. This isn't strictly necessary (the `jwks` and `verify` routes are the ones that support the vulnerability) but we want it to look kinda realistic.
