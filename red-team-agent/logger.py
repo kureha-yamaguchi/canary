@@ -73,7 +73,8 @@ class AgentLogger:
         
         self.output_dir.mkdir(exist_ok=True, parents=True)
         
-        self.run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Generate numeric run ID based on timestamp
+        self.run_id = str(int(datetime.now().timestamp() * 1000))
         self.run_dir = None  # Will be set when saving
         
         # Get prompt version info
@@ -133,18 +134,49 @@ class AgentLogger:
         """Parse the final output and extract structured information"""
         self.log_data["final_report"] = final_output
         
-        # Extract Verification Steps
-        verification_pattern = r"(?:Verification Steps|Verification|Testing Steps)[:\s]*(.*?)(?=Findings|Recommendations|$)"
-        verification_matches = re.findall(verification_pattern, final_output, re.DOTALL | re.IGNORECASE)
-        if verification_matches:
-            steps = [s.strip() for s in verification_matches[0].split('\n') if s.strip() and not s.strip().startswith('-')]
-            self.log_data["structured_report"]["verification_steps"] = steps
+        # Extract Verification Steps - try multiple patterns
+        verification_steps = []
         
-        # Also try to extract bulleted steps
-        step_pattern = r"•\s*(.*?)(?=\n|•|Findings|Recommendations)"
-        steps = re.findall(step_pattern, final_output, re.DOTALL)
-        if steps:
-            self.log_data["structured_report"]["verification_steps"].extend([s.strip() for s in steps if s.strip()])
+        # Pattern 1: "Verification Steps I've Did" followed by bulleted list
+        verification_pattern1 = r"(?:Verification Steps|Verification|Testing Steps)[\s\w]*(?:I've Did|I Did)[:\s]*(.*?)(?=\*\*?2\.|Findings|Recommendations|$)"
+        verification_matches1 = re.findall(verification_pattern1, final_output, re.DOTALL | re.IGNORECASE)
+        if verification_matches1:
+            steps_text = verification_matches1[0]
+            # Extract bulleted items
+            for line in steps_text.split('\n'):
+                line = line.strip()
+                if line and (line.startswith('-') or line.startswith('•') or line.startswith('*')):
+                    step_text = line.lstrip('-•* ').strip()
+                    if step_text and step_text not in verification_steps:
+                        verification_steps.append(step_text)
+        
+        # Pattern 2: "1. Verification Steps I've Did" followed by bullets
+        verification_pattern2 = r"\*\*?1\.\s*Verification Steps[:\s]*(.*?)(?=\*\*?2\.|Findings|Recommendations|$)"
+        verification_matches2 = re.findall(verification_pattern2, final_output, re.DOTALL | re.IGNORECASE)
+        if verification_matches2:
+            steps_text = verification_matches2[0]
+            for line in steps_text.split('\n'):
+                line = line.strip()
+                if line and (line.startswith('-') or line.startswith('•') or line.startswith('*')):
+                    step_text = line.lstrip('-•* ').strip()
+                    if step_text and step_text not in verification_steps:
+                        verification_steps.append(step_text)
+        
+        # Pattern 3: Just "Verification Steps" section
+        if not verification_steps:
+            verification_pattern3 = r"##?\s*Verification Steps[\s\n]*(.*?)(?=##?\s*Findings|##?\s*Recommendations|$)"
+            verification_matches3 = re.findall(verification_pattern3, final_output, re.DOTALL | re.IGNORECASE)
+            if verification_matches3:
+                steps_text = verification_matches3[0]
+                for line in steps_text.split('\n'):
+                    line = line.strip()
+                    if line and (line.startswith('-') or line.startswith('•') or line.startswith('*') or line[0].isdigit()):
+                        # Remove bullet or number prefix
+                        step_text = re.sub(r'^[-\d•*▪]\s*', '', line).strip()
+                        if step_text and step_text not in verification_steps:
+                            verification_steps.append(step_text)
+        
+        self.log_data["structured_report"]["verification_steps"] = verification_steps
         
         # Extract Findings
         findings_pattern = r"(?:Findings|Finding)[:\s]*(.*?)(?=Recommendations|General Recommendations|Final Notes|$)"
@@ -177,13 +209,13 @@ class AgentLogger:
         self.run_dir = self.output_dir / f"run_{self.run_id}"
         self.run_dir.mkdir(exist_ok=True, parents=True)
         
-        # Save full JSON log
-        json_file = self.run_dir / "run.json"
+        # Save full JSON log as "json"
+        json_file = self.run_dir / "json"
         with open(json_file, 'w', encoding='utf-8') as f:
             json.dump(self.log_data, f, indent=2, ensure_ascii=False)
         
-        # Save human-readable report
-        report_file = self.run_dir / "report.md"
+        # Save human-readable report as "report"
+        report_file = self.run_dir / "report"
         with open(report_file, 'w', encoding='utf-8') as f:
             f.write(self._generate_markdown_report())
         

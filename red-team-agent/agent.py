@@ -71,12 +71,13 @@ class RedTeamAgent:
         
         return agent
     
-    def activate(self, task: Optional[str] = None) -> dict:
+    def activate(self, task: Optional[str] = None, verbose: bool = True) -> dict:
         """
         Activate the agent to test the website
         
         Args:
             task: Optional specific task/prompt. If None, uses default security testing prompt.
+            verbose: If True, print Chain of Thought during execution
         
         Returns:
             Agent execution result dictionary
@@ -93,41 +94,69 @@ class RedTeamAgent:
         self.logger.set_run_info(self.website_url, self.model_name, task_prompt)
         self.logger.log_message("human", task_prompt)
         
-        # Use invoke with messages format for new agent API
-        # Wrap in callback to capture intermediate steps
+        if verbose:
+            print("🧠 Chain of Thought:\n")
+        
+        # Use invoke to get all messages at once
         result = self.agent.invoke({
             "messages": [HumanMessage(content=task_prompt)]
         })
         
-        # Extract messages and log them
+        # Extract messages
         messages = result.get("messages", [])
         
-        # Process messages and log tool calls, reasoning, etc.
-        for msg in messages:
+        # Process messages and print CoT
+        step_num = 0
+        for i, msg in enumerate(messages):
             if isinstance(msg, AIMessage):
-                content = msg.content
-                self.logger.log_message("ai", content or "")
+                content = msg.content or ""
                 
-                # Extract reasoning if available (for o3 and similar models)
-                if hasattr(msg, 'response_metadata') and msg.response_metadata:
-                    metadata = msg.response_metadata
-                    if 'reasoning_tokens' in str(metadata):
-                        # Log reasoning tokens info
-                        pass
+                # Log message
+                if content.strip():
+                    self.logger.log_message("ai", content)
                 
-                # Log tool calls
+                # Print reasoning/CoT (all AI messages except the very last one are reasoning steps)
+                is_final = (i == len(messages) - 1 or 
+                           (i < len(messages) - 1 and 
+                            not any(isinstance(messages[j], ToolMessage) for j in range(i+1, min(i+3, len(messages))))))
+                
+                if verbose and content.strip() and not is_final:
+                    # Extract first meaningful sentence/line
+                    lines = [l.strip() for l in content.split('\n') if l.strip()]
+                    if lines:
+                        reasoning = lines[0]
+                        # Truncate if too long
+                        if len(reasoning) > 250:
+                            reasoning = reasoning[:247] + "..."
+                        print(f"  💭 {reasoning}")
+                
+                # Print tool calls
                 if hasattr(msg, 'tool_calls') and msg.tool_calls:
                     for tool_call in msg.tool_calls:
                         tool_name = tool_call.get('name', 'unknown')
-                        tool_args = tool_call.get('args', {})
-                        self.logger.log_tool_call(tool_name, tool_args, "pending")
+                        if verbose:
+                            step_num += 1
+                            args = tool_call.get('args', {})
+                            # Format args nicely
+                            if args:
+                                key_vals = list(args.items())[:1]  # Show first arg only
+                                args_parts = [f"{k}='{str(v)[:40]}...'" if len(str(v)) > 40 else f"{k}='{v}'" 
+                                            for k, v in key_vals]
+                                args_str = ', '.join(args_parts)
+                            else:
+                                args_str = ""
+                            print(f"  🔧 Step {step_num}: {tool_name}({args_str})")
+                        self.logger.log_tool_call(tool_name, tool_call.get('args', {}), "pending")
             
             elif isinstance(msg, ToolMessage):
-                self.logger.log_tool_call(
-                    msg.name if hasattr(msg, 'name') else 'unknown',
-                    {},
-                    msg.content[:1000] if msg.content else ""
-                )
+                tool_name = getattr(msg, 'name', 'unknown')
+                tool_result = msg.content[:100] if msg.content else ""
+                if verbose and tool_result:
+                    result_preview = tool_result.replace('\n', ' ').strip()
+                    if len(result_preview) > 100:
+                        result_preview = result_preview[:97] + "..."
+                    print(f"  ✓ {result_preview}")
+                self.logger.log_tool_call(tool_name, {}, msg.content[:1000] if msg.content else "")
         
         # Get final output
         final_output = ""
@@ -137,6 +166,9 @@ class RedTeamAgent:
                 final_output = last_msg.content or str(messages[-1])
             else:
                 final_output = str(messages[-1])
+        
+        if verbose:
+            print()  # Blank line after CoT
         
         # Parse structured report
         self.logger.parse_and_extract_structured_report(final_output)

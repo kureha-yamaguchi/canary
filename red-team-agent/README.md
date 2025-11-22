@@ -63,8 +63,31 @@ result = agent.activate(
 
 ### Command Line
 
+**Easy Run (Recommended):**
 ```bash
 cd red-team-agent
+
+# Use default website and model
+python run.py
+
+# Use custom model with default website
+python run.py --model openai/o3-mini
+
+# Use custom website
+python run.py --website https://example.com
+
+# Use custom model and website
+python run.py --model openai/gpt-4o --website https://example.com
+
+# With browser visualization
+python run.py --open-browser
+
+# With Playwright automation
+python run.py --open-browser --playwright
+```
+
+**Or use the activate script:**
+```bash
 python activate.py https://example.com openai/gpt-4o
 
 # With browser visualization (optional)
@@ -106,10 +129,10 @@ Environment variables (loaded from `.env` files):
 
 ## Logging and Reports
 
-Each agent run automatically creates a per-run folder (`logs/run_YYYYMMDD_HHMMSS/`) containing:
+Each agent run automatically creates a per-run folder (`logs/run_<numeric_id>/`) containing:
 
-- **`run.json`** - Complete execution log with all messages, tool calls, and reasoning
-- **`report.md`** - Human-readable report with:
+- **`json`** - Complete execution log with all messages, tool calls, and reasoning
+- **`report`** - Human-readable report with:
   - Verification Steps performed
   - Findings discovered
   - Recommendations for fixes
