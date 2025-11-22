@@ -213,6 +213,32 @@ const MITREAttackVisualization = () => {
     return techniques;
   }, [techniques]);
 
+  // Calculate technique frequencies across all attacks
+  const techniqueFrequencies = useMemo(() => {
+    const frequencies = {};
+    const totalAttacks = Object.keys(attacks).length;
+    
+    if (totalAttacks === 0) {
+      return frequencies;
+    }
+    
+    // Count how many attacks use each technique
+    Object.values(attacks).forEach(attackTechniques => {
+      const uniqueTechniques = new Set(attackTechniques);
+      uniqueTechniques.forEach(techniqueId => {
+        frequencies[techniqueId] = (frequencies[techniqueId] || 0) + 1;
+      });
+    });
+    
+    return frequencies;
+  }, [attacks]);
+
+  // Get max frequency for normalization
+  const maxFrequency = useMemo(() => {
+    const frequencies = Object.values(techniqueFrequencies);
+    return frequencies.length > 0 ? Math.max(...frequencies) : 1;
+  }, [techniqueFrequencies]);
+
   // Get the selected attack's techniques as a Set for fast lookup
   const selectedAttackTechniques = useMemo(() => {
     if (!selectedAttackId || !attacks[selectedAttackId]) {
@@ -220,6 +246,26 @@ const MITREAttackVisualization = () => {
     }
     return new Set(attacks[selectedAttackId]);
   }, [selectedAttackId, attacks]);
+
+  // Generate heatmap color based on frequency - three categories: low, medium, high
+  const getHeatmapColor = (techniqueId) => {
+    const frequency = techniqueFrequencies[techniqueId] || 0;
+    
+    // Normalize frequency to 0-1 range
+    const normalized = maxFrequency > 0 ? frequency / maxFrequency : 0;
+    
+    // Three categories: low, medium, high
+    if (normalized < 0.33) {
+      // Low frequency - light blue
+      return '#87CEEB'; // Sky blue
+    } else if (normalized < 0.67) {
+      // Medium frequency - orange
+      return '#FFA500'; // Orange
+    } else {
+      // High frequency - red
+      return '#FF4500'; // Red-orange
+    }
+  };
 
   if (loading) {
     return (
@@ -265,6 +311,32 @@ const MITREAttackVisualization = () => {
           </select>
         </div>
       )}
+
+      {/* Heatmap Legend */}
+      {maxFrequency > 0 && (
+        <div className="heatmap-legend">
+          <div className="heatmap-legend-title">Technique Usage Frequency</div>
+          <div className="heatmap-legend-content">
+            <div className="heatmap-legend-scale">
+              <div className="heatmap-legend-item">
+                <div className="heatmap-legend-color" style={{ backgroundColor: '#87CEEB' }}></div>
+                <span>Low (0-{Math.max(0, Math.floor(maxFrequency * 0.33))} campaigns)</span>
+              </div>
+              <div className="heatmap-legend-item">
+                <div className="heatmap-legend-color" style={{ backgroundColor: '#FFA500' }}></div>
+                <span>Medium ({Math.max(1, Math.floor(maxFrequency * 0.33) + 1)}-{Math.floor(maxFrequency * 0.67)} campaigns)</span>
+              </div>
+              <div className="heatmap-legend-item">
+                <div className="heatmap-legend-color" style={{ backgroundColor: '#FF4500' }}></div>
+                <span>High ({Math.max(1, Math.floor(maxFrequency * 0.67) + 1)}-{maxFrequency} campaigns)</span>
+              </div>
+            </div>
+            <div className="heatmap-legend-note">
+              Color indicates how many attack campaigns use each technique (out of {Object.keys(attacks).length} total campaigns)
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="matrix-table">
         <table>
@@ -287,11 +359,18 @@ const MITREAttackVisualization = () => {
                   <td key={tactic} className="tactic-column">
                     {tacticTechniques.map(technique => {
                       const isInAttack = selectedAttackTechniques.has(technique.aml_id);
+                      const heatmapColor = getHeatmapColor(technique.aml_id);
+                      const frequency = techniqueFrequencies[technique.aml_id] || 0;
                       return (
                         <div 
                           key={technique.aml_id} 
                           className={`technique-cell ${isInAttack ? 'attack-technique' : ''}`}
+                          title={frequency > 0 ? `Used in ${frequency} out of ${Object.keys(attacks).length} attack campaigns` : 'Not used in any campaigns'}
                         >
+                          <div 
+                            className="technique-heatmap-bar"
+                            style={{ backgroundColor: heatmapColor }}
+                          ></div>
                           <a 
                             href={`https://attack.mitre.org/techniques/${technique.aml_id}/`}
                             target="_blank"
@@ -301,7 +380,12 @@ const MITREAttackVisualization = () => {
                             <span className={`technique-name ${isInAttack ? 'attack-name' : ''}`}>
                               {technique.name}
                             </span>
-                            <span className="technique-id">{technique.aml_id}</span>
+                            <span className="technique-id">
+                              {technique.aml_id}
+                              {frequency > 0 && (
+                                <span className="technique-frequency"> ({frequency})</span>
+                              )}
+                            </span>
                           </a>
                         </div>
                       );

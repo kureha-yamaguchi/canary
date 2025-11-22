@@ -160,10 +160,20 @@
   border-bottom: 1px solid #f0f0f0;
   padding: 0;
   transition: transform 0.1s ease;
+  position: relative;
 }
 
 .technique-cell:last-child {
   border-bottom: none;
+}
+
+.technique-heatmap-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 1;
 }
 
 .technique-cell.attack-technique {
@@ -258,4 +268,79 @@
 
 .error-message {
   color: #d32f2f;
+}
+
+/* Heatmap Legend Styles */
+.heatmap-legend {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e0e0e0;
+}
+
+.heatmap-legend-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.heatmap-legend-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.heatmap-legend-scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+}
+
+.heatmap-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.heatmap-legend-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  flex-shrink: 0;
+}
+
+.heatmap-legend-item span {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.heatmap-legend-note {
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+/* Technique Frequency Display */
+.technique-frequency {
+  color: #888;
+  font-size: 10px;
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+/* Ensure heatmap colors are visible on technique cells */
+.technique-cell {
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.technique-cell:hover {
+  transform: translateX(2px);
 }
