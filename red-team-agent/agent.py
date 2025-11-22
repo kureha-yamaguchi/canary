@@ -88,10 +88,14 @@ class RedTeamAgent:
                 "Set it during initialization: RedTeamAgent(website_url='https://example.com')"
             )
         
-        task_prompt = task or get_default_task_prompt(self.website_url)
-        
         # Update logger with task (this also detects vulnerability)
-        self.logger.set_run_info(self.website_url, self.model_name, task_prompt)
+        self.logger.set_run_info(self.website_url, self.model_name, task or "")
+        
+        # Get vulnerability info to customize prompt
+        vulnerability = self.logger.log_data.get('vulnerability')
+        vulnerability_id = vulnerability.get('vulnerability_id') if vulnerability else None
+        
+        task_prompt = task or get_default_task_prompt(self.website_url, vulnerability_id)
         self.logger.log_message("human", task_prompt)
         
         if verbose:

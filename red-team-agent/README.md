@@ -34,6 +34,10 @@ OPENROUTER_API_KEY=your_openrouter_api_key_here
 DEFAULT_MODEL=openai/gpt-4o
 AGENT_TEMPERATURE=0.7
 REQUEST_TIMEOUT=10
+
+# Supabase configuration for vulnerability logging (optional)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 ```
 
 ## Usage
@@ -105,6 +109,23 @@ Environment variables (loaded from `.env` files):
 - `DEFAULT_MODEL` (optional) - Default model to use (default: `openai/gpt-4o`)
 - `AGENT_TEMPERATURE` (optional) - LLM temperature (default: `0.7`)
 - `REQUEST_TIMEOUT` (optional) - HTTP request timeout in seconds (default: `10`)
+- `SUPABASE_URL` (optional) - Supabase project URL for vulnerability logging
+- `SUPABASE_SERVICE_ROLE_KEY` (optional) - Supabase service role key for vulnerability logging
+
+### Vulnerability Logging
+
+The red-team-agent can automatically log SQL injection attempts (and other vulnerabilities) to Supabase when they are detected. To enable this:
+
+1. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in your `.env` file
+2. The agent will automatically log to the `vulnerability_logs` table:
+   - SQL injection attempts when vulnerabilities are found
+   - Payloads used (`sql_payload`)
+   - HTTP methods and parameters tested
+   - Success/failure status
+   - Response indicators
+   - Vulnerable query patterns
+
+Logs are written to the `vulnerability_logs` table in Supabase. If Supabase is not configured, the agent will continue to work but won't log to the database (you'll see a warning message).
 
 ## Available Models (OpenRouter)
 

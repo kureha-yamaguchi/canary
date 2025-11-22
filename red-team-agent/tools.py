@@ -92,6 +92,41 @@ def check_endpoint(url: str) -> str:
 
 
 @tool
+def make_post_request(url: str, json_data: Optional[Dict] = None, headers: Optional[Dict] = None) -> str:
+    """
+    Make a POST request to a URL with optional JSON body and headers.
+    Useful for testing API endpoints that accept POST requests.
+    
+    Args:
+        url: The full URL to POST to (e.g., https://example.com/api/login)
+        json_data: Optional JSON data to send in the request body (as a dict)
+        headers: Optional custom headers to include in the request
+    
+    Returns:
+        String containing response status, headers, and body content
+    """
+    try:
+        request_headers = headers or {}
+        if json_data and 'Content-Type' not in request_headers:
+            request_headers['Content-Type'] = 'application/json'
+        
+        response = requests.post(
+            url, 
+            json=json_data,
+            headers=request_headers,
+            timeout=config.REQUEST_TIMEOUT,
+            allow_redirects=False
+        )
+        
+        content_preview = response.text[:500] if response.text else "(empty)"
+        headers_str = "\n".join([f"{k}: {v}" for k, v in response.headers.items()])
+        
+        return f"Status: {response.status_code}\nHeaders:\n{headers_str}\n\nBody:\n{content_preview}"
+    except requests.exceptions.RequestException as e:
+        return f"Error making POST request to {url}: {str(e)}"
+
+
+@tool
 def check_admin_endpoints(base_url: str) -> str:
     """
     Check common admin and management endpoints for authentication bypass vulnerabilities.
@@ -431,6 +466,17 @@ def test_sql_injection(url: str, parameter: Optional[str] = None, method: str = 
     from urllib.parse import urlparse, parse_qs, urlencode
     import json
     
+    # Import vulnerability logger
+    try:
+        from .vulnerability_logger import log_sql_injection_attempt
+    except ImportError:
+        try:
+            from vulnerability_logger import log_sql_injection_attempt
+        except ImportError:
+            # Logger not available, create a no-op function
+            def log_sql_injection_attempt(*args, **kwargs):
+                return False
+    
     # Common SQL injection payloads
     sql_payloads = [
         "' OR '1'='1",
@@ -514,10 +560,37 @@ def test_sql_injection(url: str, parameter: Optional[str] = None, method: str = 
                     
                     if found_errors:
                         vulnerable.append(f"GET {param} with payload '{payload}': Found SQL error indicators: {', '.join(found_errors)}")
+                        # Log to Supabase
+                        log_sql_injection_attempt(
+                            url=test_url,
+                            payload=payload,
+                            method="GET",
+                            parameter=param,
+                            success=True,
+                            response_indicators=found_errors
+                        )
                     elif found_indicators or (response_json and isinstance(response_json, dict) and 'warning' in response_json):
                         vulnerable.append(f"GET {param} with payload '{payload}': SQL injection successful - {', '.join(found_indicators) if found_indicators else 'injection detected in response'}")
+                        # Log to Supabase
+                        log_sql_injection_attempt(
+                            url=test_url,
+                            payload=payload,
+                            method="GET",
+                            parameter=param,
+                            success=True,
+                            response_indicators=found_indicators if found_indicators else ['injection detected in response']
+                        )
                     elif response.status_code == 500:
                         results.append(f"GET {param} with payload '{payload}': Status 500 (possible SQL error)")
+                        # Log suspicious attempt
+                        log_sql_injection_attempt(
+                            url=test_url,
+                            payload=payload,
+                            method="GET",
+                            parameter=param,
+                            success=False,
+                            response_indicators=['status_500']
+                        )
                         
                 except requests.exceptions.RequestException as e:
                     results.append(f"GET {param} with payload '{payload}': Error - {str(e)}")
@@ -578,10 +651,37 @@ def test_sql_injection(url: str, parameter: Optional[str] = None, method: str = 
                     
                     if found_errors:
                         vulnerable.append(f"POST {param} (JSON) with payload '{payload}': Found SQL error indicators: {', '.join(found_errors)}")
+                        # Log to Supabase
+                        log_sql_injection_attempt(
+                            url=base_url,
+                            payload=payload,
+                            method="POST",
+                            parameter=param,
+                            success=True,
+                            response_indicators=found_errors
+                        )
                     elif is_vulnerable or found_indicators:
                         vulnerable.append(f"POST {param} (JSON) with payload '{payload}': SQL injection successful - detected in response")
+                        # Log to Supabase
+                        log_sql_injection_attempt(
+                            url=base_url,
+                            payload=payload,
+                            method="POST",
+                            parameter=param,
+                            success=True,
+                            response_indicators=found_indicators if found_indicators else ['injection detected in response']
+                        )
                     elif response.status_code == 500:
                         results.append(f"POST {param} (JSON) with payload '{payload}': Status 500 (possible SQL error)")
+                        # Log suspicious attempt
+                        log_sql_injection_attempt(
+                            url=base_url,
+                            payload=payload,
+                            method="POST",
+                            parameter=param,
+                            success=False,
+                            response_indicators=['status_500']
+                        )
                         
                 except requests.exceptions.RequestException as e:
                     results.append(f"POST {param} (JSON) with payload '{payload}': Error - {str(e)}")
@@ -1153,6 +1253,115 @@ def fuzz_parameters(url: str, parameter: str, fuzz_values: Optional[List[str]] =
 
 
 @tool
+def check_client_side_api_keys(url: str) -> str:
+    """
+    Check for API keys exposed in client-side code (JavaScript, HTML data attributes, server-rendered HTML).
+    This is specifically for Vulnerability ID 8: Sensitive Data Exposure - Client Side.
+    Uses Playwright to check rendered DOM, JavaScript context, and HTML source.
+    
+    Args:
+        url: The URL to check
+    
+    Returns:
+        String containing API key exposure findings
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+        
+        findings = []
+        api_key_patterns = [
+            r'api[_-]?key["\']?\s*[:=]\s*["\']([a-zA-Z0-9_-]{20,})',
+            r'apikey["\']?\s*[:=]\s*["\']([a-zA-Z0-9_-]{20,})',
+            r'data[_-]?api[_-]?key["\']?\s*[:=]\s*["\']([a-zA-Z0-9_-]{20,})',
+            r'["\']([a-zA-Z0-9_-]{20,})["\']',  # Generic long strings that might be keys
+        ]
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url, wait_until="networkidle", timeout=15000)
+            
+            # 1. Check HTML source (including data attributes)
+            html_source = page.content()
+            for pattern in api_key_patterns:
+                matches = re.findall(pattern, html_source, re.IGNORECASE)
+                if matches:
+                    # Filter out false positives (common words, short strings)
+                    valid_keys = [m for m in matches if len(m) >= 20 and not any(word in m.lower() for word in ['function', 'return', 'const', 'let', 'var', 'true', 'false'])]
+                    if valid_keys:
+                        findings.append(f"⚠️ API key found in HTML source/data attributes: {valid_keys[0][:30]}...")
+                        break
+            
+            # 2. Check JavaScript context (execute JS to find API keys in window/global scope)
+            try:
+                js_result = page.evaluate("""
+                    () => {
+                        const keys = [];
+                        // Check window object for API keys
+                        for (let key in window) {
+                            if (key.toLowerCase().includes('api') && key.toLowerCase().includes('key')) {
+                                keys.push({location: 'window.' + key, value: String(window[key]).substring(0, 50)});
+                            }
+                        }
+                        // Check document for data attributes
+                        const elements = document.querySelectorAll('[data-api-key], [data-apiKey], [data-apikey]');
+                        elements.forEach(el => {
+                            const attr = el.getAttribute('data-api-key') || el.getAttribute('data-apiKey') || el.getAttribute('data-apikey');
+                            if (attr) keys.push({location: 'data attribute', value: attr.substring(0, 50)});
+                        });
+                        return keys;
+                    }
+                """)
+                if js_result and len(js_result) > 0:
+                    for item in js_result:
+                        findings.append(f"⚠️ API key found in JavaScript context: {item['location']} = {item['value']}...")
+            except Exception as e:
+                pass  # JavaScript execution failed, continue with other checks
+            
+            # 3. Check page text content for exposed keys
+            text_content = page.locator("body").inner_text()
+            for pattern in api_key_patterns[:2]:  # Use first 2 patterns for text search
+                matches = re.findall(pattern, text_content, re.IGNORECASE)
+                if matches:
+                    valid_keys = [m for m in matches if len(m) >= 20]
+                    if valid_keys:
+                        findings.append(f"⚠️ API key found in page text content: {valid_keys[0][:30]}...")
+                        break
+            
+            browser.close()
+        
+        # Also check raw HTML response (for server-rendered content)
+        try:
+            response = requests.get(url, timeout=config.REQUEST_TIMEOUT)
+            html_content = response.text
+            for pattern in api_key_patterns:
+                matches = re.findall(pattern, html_content, re.IGNORECASE)
+                if matches:
+                    valid_keys = [m for m in matches if len(m) >= 20 and not any(word in m.lower() for word in ['function', 'return', 'const', 'let', 'var'])]
+                    if valid_keys:
+                        findings.append(f"⚠️ API key found in server-rendered HTML: {valid_keys[0][:30]}...")
+                        break
+        except:
+            pass
+        
+        output = []
+        if findings:
+            output.append("🚨 CLIENT-SIDE API KEY EXPOSURE DETECTED:")
+            output.extend(findings)
+            output.append("")
+            output.append("This matches Vulnerability ID 8: Sensitive Data Exposure - Client Side")
+        else:
+            output.append("✓ No API keys detected in client-side code")
+        
+        return "\n".join(output)
+        
+    except ImportError:
+        return "Error: Playwright not installed. Install with: pip install playwright && playwright install"
+    except Exception as e:
+        return f"Error checking for client-side API keys: {str(e)}"
+
+
+@tool
 def check_information_disclosure(url: str) -> str:
     """
     Check for information disclosure vulnerabilities.
@@ -1243,6 +1452,7 @@ def get_tools() -> List:
     tools = [
         scan_website,
         check_endpoint,
+        make_post_request,  # Tool for making POST requests with JSON
         check_admin_endpoints,
         test_sql_injection,
         test_xss,
@@ -1254,6 +1464,7 @@ def get_tools() -> List:
         check_csrf_protection,
         fuzz_parameters,
         check_information_disclosure,
+        check_client_side_api_keys,  # New tool for Vulnerability ID 8
     ]
     
     # Add custom Playwright tools if available

@@ -1,5 +1,6 @@
 """Prompts for the Red Team Agent"""
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from typing import Optional
 
 
 SYSTEM_PROMPT = """You are a red team security agent testing websites for vulnerabilities.
@@ -10,6 +11,7 @@ Available tool categories:
 - HTTP Reconnaissance: scan_website, check_endpoint, check_admin_endpoints, analyze_headers
 - Vulnerability Testing: test_sql_injection, test_xss, test_http_methods, test_authentication_bypass
 - Discovery: discover_api_endpoints, enumerate_directories, check_information_disclosure
+- Client-Side Security: check_client_side_api_keys (for Vulnerability ID 8 - API keys in JavaScript/HTML)
 - Parameter Testing: fuzz_parameters, check_csrf_protection
 - Browser Tools: navigate_page, take_screenshot, check_page_content (for visual/rendered content)
 - Browser Interaction: browser_interact (navigate, click, fill, extract, screenshot - Playwright/Browser-use powered)
@@ -27,7 +29,8 @@ Required steps:
 10. Use test_xss on any forms or parameters you discover
 11. Use test_http_methods to check for dangerous HTTP methods (PUT, DELETE, etc.)
 12. Use check_information_disclosure to look for exposed sensitive data
-13. Use browser_interact with action="navigate" to load pages, action="click" to interact with buttons, action="fill" for forms, action="extract" to get DOM content
+13. **CRITICAL: For Vulnerability ID 8 (Sensitive Data Exposure - Client Side), use check_client_side_api_keys to check for API keys in JavaScript, HTML data attributes, and server-rendered HTML**
+14. Use browser_interact with action="navigate" to load pages, action="click" to interact with buttons, action="fill" for forms, action="extract" to get DOM content
 14. Use fuzz_parameters to test specific parameters for unexpected behavior
 15. Use check_csrf_protection to verify forms have CSRF protection
 16. Only then provide your findings based on actual tool results
@@ -49,6 +52,7 @@ Discovery tools:
 - discover_api_endpoints: Find API endpoints by testing common paths
 - enumerate_directories: Find exposed directories and files (backups, configs, etc.)
 - check_information_disclosure: Look for exposed API keys, credentials, stack traces
+- check_client_side_api_keys: Specifically check for API keys exposed in client-side code (JavaScript, HTML data attributes, server-rendered HTML) - for Vulnerability ID 8
 
 Browser automation tools (browser_interact) are especially useful for:
 - Seeing JavaScript-rendered content (not just raw HTML)
@@ -74,30 +78,41 @@ def get_base_prompt() -> ChatPromptTemplate:
     ])
 
 
-def get_default_task_prompt(website_url: str) -> str:
+def get_default_task_prompt(website_url: str, vulnerability_id: Optional[int] = None) -> str:
     """
     Generate the default security testing task prompt
     
     Args:
         website_url: The target website URL
+        vulnerability_id: Optional vulnerability ID to customize the prompt
     
     Returns:
         Task prompt string
     """
-    return f"""Test the security of the website at {website_url}.
+    base_prompt = f"""Test the security of the website at {website_url}.
 
 MANDATORY: You MUST use tools to test the website. Start by:
 1. Use scan_website tool on {website_url}
 2. Use check_page_content to see the actual page and find forms/input fields
-3. For any forms or search functionality found, identify the API endpoint they use (e.g., /api/search, /api/users)
-4. Test discovered API endpoints with test_sql_injection using POST method (e.g., test_sql_injection(url="{website_url}/api/search", method="POST"))
-5. Use discover_api_endpoints to find common API paths, then test each with test_sql_injection
-6. Only report findings based on actual tool results
+3. **CRITICAL: For client-side vulnerabilities (especially Vulnerability ID 8 - Sensitive Data Exposure), use check_client_side_api_keys to check for API keys in JavaScript, HTML data attributes, and server-rendered HTML**
+4. Use check_information_disclosure to look for exposed sensitive data
+5. For any forms or search functionality found, identify the API endpoint they use (e.g., /api/search, /api/users)
+6. Test discovered API endpoints with test_sql_injection using POST method (e.g., test_sql_injection(url="{website_url}/api/search", method="POST"))
+7. Use discover_api_endpoints to find common API paths, then test each with test_sql_injection
+8. Only report findings based on actual tool results
 
 CRITICAL: If you find a search form, user input field, or any form that accepts user data, you MUST:
 - Identify the endpoint it posts to (check form action or network requests)
 - Test that endpoint with test_sql_injection using POST method
 - Test with common parameter names like "username", "id", "search", "query"
+
+CRITICAL FOR VULNERABILITY ID 8 (Sensitive Data Exposure - Client Side):
+- You MUST use check_client_side_api_keys tool to check for API keys exposed in:
+  * JavaScript code
+  * HTML data attributes (data-api-key, etc.)
+  * Server-rendered HTML
+  * Browser JavaScript context (window object, global variables)
+- This is the PRIMARY tool for detecting this vulnerability type
 
 After using tools, provide a CONCISE report with these sections:
 
@@ -110,4 +125,10 @@ After using tools, provide a CONCISE report with these sections:
 4. **Recommendations**: Brief actionable fixes for each finding.
 
 Keep the report SHORT - focus on actual vulnerabilities found, not generic recommendations."""
+    
+    # Add specific instructions for Vulnerability ID 8
+    if vulnerability_id == 8:
+        base_prompt += "\n\n⚠️ IMPORTANT: This website is expected to have Vulnerability ID 8 (Sensitive Data Exposure - Client Side). You MUST use check_client_side_api_keys tool to find exposed API keys in client-side code!"
+    
+    return base_prompt
 
