@@ -1,0 +1,56 @@
+{
+  "websites": [
+    {
+      "id": "vulnerability-8-api-key",
+      "name": "API Key Exposure Honeypot",
+      "vulnerability_id": 8,
+      "vulnerability_name": "Sensitive Data Exposure - Client Side",
+      "description": "Exposes API keys in JavaScript, HTML data attributes, and server-rendered HTML",
+      "port": 3000,
+      "path": "vulnerability-8-api-key",
+      "folder_name": "vulnerability-8-api-key",
+      "mitre_techniques": ["T1552", "T1110", "T1190"],
+      "status": "active"
+    },
+    {
+      "id": "vulnerability-1-sql-injection",
+      "name": "SQL Injection Honeypot",
+      "vulnerability_id": 1,
+      "vulnerability_name": "SQL Injection",
+      "description": "User input concatenated directly into SQL queries without sanitization",
+      "port": 3001,
+      "path": "vulnerability-1-sql-injection",
+      "mitre_techniques": ["T1190"],
+      "status": "active"
+    },
+    {
+      "id": "vulnerability-2-xss-reflected",
+      "name": "Reflected XSS Honeypot",
+      "vulnerability_id": 2,
+      "vulnerability_name": "Cross-Site Scripting (XSS) - Reflected",
+      "description": "User input echoed back to page without HTML encoding",
+      "port": 3002,
+      "path": "vulnerability-2-xss-reflected",
+      "mitre_techniques": ["T1189"],
+      "status": "planned"
+    },
+    {
+      "id": "vulnerability-3-xss-stored",
+      "name": "Stored XSS Honeypot",
+      "vulnerability_id": 3,
+      "vulnerability_name": "Cross-Site Scripting (XSS) - Stored",
+      "description": "Malicious scripts saved to database and displayed to other users",
+      "port": 3003,
+      "path": "vulnerability-3-xss-stored",
+      "mitre_techniques": ["T1189"],
+      "status": "planned"
+    }
+  ],
+  "metadata": {
+    "last_updated": "2025-01-XX",
+    "total_websites": 4,
+    "active_websites": 2,
+    "planned_websites": 2
+  }
+}
+

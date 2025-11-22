@@ -90,12 +90,25 @@ class RedTeamAgent:
         
         task_prompt = task or get_default_task_prompt(self.website_url)
         
-        # Update logger with task
+        # Update logger with task (this also detects vulnerability)
         self.logger.set_run_info(self.website_url, self.model_name, task_prompt)
         self.logger.log_message("human", task_prompt)
         
         if verbose:
-            print("🧠 Chain of Thought:\n")
+            # Print run information
+            print(f"🔍 Testing Website: {self.website_url}")
+            vulnerability = self.logger.log_data.get('vulnerability')
+            if vulnerability:
+                vuln_name = vulnerability.get('vulnerability_name', 'Unknown')
+                vuln_id = vulnerability.get('vulnerability_id', 'N/A')
+                print(f"🎯 Expected Vulnerability: {vuln_name} (ID: {vuln_id})")
+                if vulnerability.get('description'):
+                    print(f"   Description: {vulnerability['description']}")
+            else:
+                print(f"⚠️  Vulnerability: Not detected from URL")
+            print(f"🤖 Model: {self.model_name}")
+            print(f"📝 Run ID: {self.logger.run_id}")
+            print("\n🧠 Chain of Thought:\n")
         
         # Use invoke to get all messages at once
         result = self.agent.invoke({

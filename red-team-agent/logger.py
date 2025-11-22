@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import re
 import sys
+from urllib.parse import urlparse
 
 
 def get_git_commit_hash() -> Optional[str]:
@@ -56,6 +57,129 @@ def get_prompt_version() -> Dict[str, str]:
     return prompt_version
 
 
+def detect_vulnerability_from_url(website_url: str) -> Optional[Dict[str, Any]]:
+    """
+    Detect what vulnerability a website has by matching it against the registry.
+    
+    Args:
+        website_url: The website URL to check
+    
+    Returns:
+        Dictionary with vulnerability information, or None if not found
+    """
+    try:
+        # Load registry.json
+        registry_path = Path(__file__).parent.parent / "deterministic-websites" / "registry.json"
+        if not registry_path.exists():
+            return None
+        
+        with open(registry_path, 'r', encoding='utf-8') as f:
+            registry = json.load(f)
+        
+        # Parse the URL to get port or path
+        parsed = urlparse(website_url)
+        url_port = parsed.port
+        url_scheme = parsed.scheme or "http"
+        url_host = parsed.hostname or ""
+        url_path = parsed.path or ""
+        
+        # Determine actual port (handle default ports)
+        if url_port:
+            actual_port = url_port
+        elif url_scheme == "https":
+            actual_port = 443
+        elif url_scheme == "http":
+            actual_port = 80
+        else:
+            actual_port = None
+        
+        # Try to match by port first (including default ports)
+        if actual_port:
+            for website in registry.get("websites", []):
+                if website.get("port") == actual_port:
+                    return {
+                        "vulnerability_id": website.get("vulnerability_id"),
+                        "vulnerability_name": website.get("vulnerability_name"),
+                        "description": website.get("description"),
+                        "website_id": website.get("id"),
+                        "website_name": website.get("name"),
+                        "port": website.get("port"),
+                        "mitre_techniques": website.get("mitre_techniques", [])
+                    }
+        
+        # Also try to match by explicit port number in registry
+        # (in case URL has non-standard port that matches)
+        if url_port:
+            for website in registry.get("websites", []):
+                if website.get("port") == url_port:
+                    return {
+                        "vulnerability_id": website.get("vulnerability_id"),
+                        "vulnerability_name": website.get("vulnerability_name"),
+                        "description": website.get("description"),
+                        "website_id": website.get("id"),
+                        "website_name": website.get("name"),
+                        "port": website.get("port"),
+                        "mitre_techniques": website.get("mitre_techniques", [])
+                    }
+        
+        # Try to match by path or hostname
+        for website in registry.get("websites", []):
+            website_path = website.get("path", "")
+            folder_name = website.get("folder_name", "")
+            
+            # Check if path or folder_name appears in URL
+            if website_path and (website_path in url_path or website_path in url_host):
+                return {
+                    "vulnerability_id": website.get("vulnerability_id"),
+                    "vulnerability_name": website.get("vulnerability_name"),
+                    "description": website.get("description"),
+                    "website_id": website.get("id"),
+                    "website_name": website.get("name"),
+                    "port": website.get("port"),
+                    "mitre_techniques": website.get("mitre_techniques", [])
+                }
+            
+            if folder_name and (folder_name in url_path or folder_name in url_host):
+                return {
+                    "vulnerability_id": website.get("vulnerability_id"),
+                    "vulnerability_name": website.get("vulnerability_name"),
+                    "description": website.get("description"),
+                    "website_id": website.get("id"),
+                    "website_name": website.get("name"),
+                    "port": website.get("port"),
+                    "mitre_techniques": website.get("mitre_techniques", [])
+                }
+        
+        # Try searching in code/terminal for vulnerability mentions
+        # This is a fallback if registry doesn't match
+        # Search common vulnerability patterns in the URL
+        url_lower = website_url.lower()
+        vulnerability_keywords = {
+            "sql": {"vulnerability_name": "SQL Injection", "vulnerability_id": 1},
+            "xss": {"vulnerability_name": "Cross-Site Scripting (XSS)", "vulnerability_id": 2},
+            "api-key": {"vulnerability_name": "Sensitive Data Exposure - Client Side", "vulnerability_id": 8},
+            "api_key": {"vulnerability_name": "Sensitive Data Exposure - Client Side", "vulnerability_id": 8},
+        }
+        
+        for keyword, vuln_info in vulnerability_keywords.items():
+            if keyword in url_lower:
+                return {
+                    "vulnerability_id": vuln_info["vulnerability_id"],
+                    "vulnerability_name": vuln_info["vulnerability_name"],
+                    "description": f"Detected from URL keyword: {keyword}",
+                    "website_id": None,
+                    "website_name": None,
+                    "port": None,
+                    "mitre_techniques": []
+                }
+        
+        return None
+        
+    except Exception as e:
+        # If anything goes wrong, return None (don't crash the agent)
+        return None
+
+
 class AgentLogger:
     """Logger for capturing agent execution and generating reports"""
     
@@ -73,8 +197,9 @@ class AgentLogger:
         
         self.output_dir.mkdir(exist_ok=True, parents=True)
         
-        # Generate numeric run ID based on timestamp
-        self.run_id = str(int(datetime.now().timestamp() * 1000))
+        # Generate run ID based on exact time (YYYYMMDD_HHMMSS format)
+        now = datetime.now()
+        self.run_id = now.strftime("%Y%m%d_%H%M%S")
         self.run_dir = None  # Will be set when saving
         
         # Get prompt version info
@@ -86,6 +211,7 @@ class AgentLogger:
             "website_url": None,
             "model": None,
             "task": None,
+            "vulnerability": None,  # Vulnerability info will be set when website_url is provided
             "prompt_version": prompt_version,
             "messages": [],
             "tool_calls": [],
@@ -125,10 +251,15 @@ class AgentLogger:
         })
     
     def set_run_info(self, website_url: str, model: str, task: str):
-        """Set run information"""
+        """Set run information and detect vulnerability from URL"""
         self.log_data["website_url"] = website_url
         self.log_data["model"] = model
         self.log_data["task"] = task
+        
+        # Detect vulnerability from URL
+        vulnerability_info = detect_vulnerability_from_url(website_url)
+        if vulnerability_info:
+            self.log_data["vulnerability"] = vulnerability_info
     
     def parse_and_extract_structured_report(self, final_output: str):
         """Parse the final output and extract structured information"""
@@ -230,7 +361,37 @@ class AgentLogger:
         url = self.log_data.get('website_url', 'N/A')
         model = self.log_data.get('model', 'N/A')
         run_id = self.log_data.get('run_id', 'N/A')
-        report.append(f"\n**URL:** {url} | **Model:** {model} | **Run:** {run_id}")
+        timestamp = self.log_data.get('timestamp', 'N/A')
+        
+        # Format timestamp for display
+        try:
+            # Handle ISO format with or without timezone
+            if 'Z' in timestamp:
+                dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            elif '+' in timestamp or timestamp.count('-') > 2:
+                dt = datetime.fromisoformat(timestamp)
+            else:
+                # Fallback: try parsing as is
+                dt = datetime.fromisoformat(timestamp)
+            formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            # If parsing fails, use the timestamp as-is
+            formatted_time = timestamp
+        
+        report.append(f"\n**URL:** {url} | **Model:** {model} | **Run ID:** {run_id} | **Time:** {formatted_time}")
+        
+        # Add vulnerability information if available
+        vulnerability = self.log_data.get('vulnerability')
+        if vulnerability:
+            vuln_name = vulnerability.get('vulnerability_name', 'Unknown')
+            vuln_id = vulnerability.get('vulnerability_id', 'N/A')
+            report.append(f"\n**Expected Vulnerability:** {vuln_name} (ID: {vuln_id})")
+            if vulnerability.get('description'):
+                report.append(f"**Description:** {vulnerability['description']}")
+            if vulnerability.get('mitre_techniques'):
+                report.append(f"**MITRE Techniques:** {', '.join(vulnerability['mitre_techniques'])}")
+        else:
+            report.append(f"\n**Expected Vulnerability:** Not detected from URL")
         
         # Prompt version info
         prompt_version = self.log_data.get('prompt_version', {})
