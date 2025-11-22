@@ -1,19 +1,19 @@
 FROM node:18-alpine
 
-WORKDIR /app
+WORKDIR /app/frontend
 
 # Copy package files
-COPY dashboard/package*.json ./
+COPY dashboard/frontend/package*.json ./
 
 # Install dependencies
 RUN if [ -f package.json ]; then npm install; fi
 
 # Copy application files
-COPY dashboard/ ./
+COPY dashboard/frontend/ ./
 
 # Expose React default port
 EXPOSE 3000
 
-# Start React app
-CMD ["npm", "start"]
+# Start React app in dev mode
+CMD ["npm", "run", "dev", "--", "--host"]
 

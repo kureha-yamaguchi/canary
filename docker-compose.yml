@@ -1,6 +1,20 @@
-version: '3.8'
-
 services:
+  dashboard-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard-backend
+    container_name: canary-dashboard-backend
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./dashboard/backend:/app/backend
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app/backend
+      # Supabase variables are loaded from .env file via env_file above
+    restart: unless-stopped
+
   dashboard:
     build:
       context: .
@@ -9,10 +23,13 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./dashboard:/app
-      - /app/node_modules
+      - ./dashboard/frontend:/app/frontend
+      - /app/frontend/node_modules
     environment:
       - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8001
+    depends_on:
+      - dashboard-backend
     restart: unless-stopped
 
   multi-website-builder:

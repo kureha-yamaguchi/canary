@@ -43,13 +43,18 @@ def main():
     # Clean up parent dataframe to remove tactics column
     df_parent = df_parent[["technique_id", "name", "description", "url", "domain"]]
 
+    # Clean up child dataframe to remove tactics column
+    df_child = df_child[["technique_id", "name", "description", "url", "domain", "parent_id"]]
+
     # Save to CSV files
     df_parent.to_csv(".data/parent.csv", index=False)
+    df_child.to_csv(".data/children.csv", index=False)
     df_tactics.to_csv(".data/tactics.csv", index=False)
 
     print(f"Successfully processed {len(df_parent)} parent techniques")
+    print(f"Successfully processed {len(df_child)} child techniques")
     print(f"Created {len(df_tactics)} tactic mappings")
-    print("Output files: parent.csv, tactics.csv")
+    print("Output files: parent.csv, children.csv, tactics.csv")
 
 
 if __name__ == "__main__":

@@ -3,11 +3,22 @@ name = "mitre-attack"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
+authors = [
+    { name = "Oliver Normand", email = "oliver@normand.uk" }
+]
 requires-python = ">=3.12"
 dependencies = [
-    "numpy>=2.3.5",
     "pandas>=2.3.3",
+    "pydantic>=2.12.4",
+    "pydantic-ai>=1.22.0",
 ]
+
+[project.scripts]
+mitre-attack = "mitre_attack:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
