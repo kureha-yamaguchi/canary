@@ -17,6 +17,32 @@ function getSessionId(request: Request): string {
   return `${ip.split(',')[0]}_${timestamp}`;
 }
 
+const TECHNIQUE_APPLICATION_ACCESS_TOKEN = 'T1110';
+const TECHNIQUE_BRUTE_FORCE = 'T1550';
+
+async function logAttempt(
+  request: Request,
+  success?: boolean,
+  technique_id: string = TECHNIQUE_BRUTE_FORCE, // Default to: Application Access Token
+) {
+  const vulnerability_type = technique_id === TECHNIQUE_APPLICATION_ACCESS_TOKEN
+    ? 'brute-force'
+    : 'jwt-algorithm-confusion';
+  const attacker_id = request.headers.get('x-forwarded-for')?.split(',')[0] ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+  const session_id = getSessionId(request);
+  console.log("logging attempt to supabase");
+  await logHoneypotTrigger({
+      vulnerability_type,
+      base_url: process.env.VERCEL_PROJECT_PRODUCTION_URL ?? 'http://localhost:3000',
+      technique_id,
+      attacker_id,
+      session_id,
+      success,
+    });
+}
+
 // 🔥 TOGGLE VULNERABILITY HERE 🔥
 const VULNERABLE_MODE = true; // Set to false for secure mode
 
@@ -35,7 +61,6 @@ export async function POST(request: NextRequest) {
     const publicKey = process.env.JWT_PUBLIC_KEY!.replace(/\\n/g, '\n');
 
     let decoded;
-    let isAttackAttempt = false;
 
     if (VULNERABLE_MODE) {
       // ⚠️ VULNERABLE: Accepts any algorithm
@@ -54,7 +79,6 @@ export async function POST(request: NextRequest) {
           if (signatureB64 === expectedSignature) {
             const payloadStr = Buffer.from(payloadB64, 'base64url').toString();
             decoded = JSON.parse(payloadStr);
-            isAttackAttempt = true;
             console.log('✅ HS256 verification succeeded!');
             console.log('✅ Decoded payload:', decoded);
           } else {
@@ -64,6 +88,7 @@ export async function POST(request: NextRequest) {
         } else {
           console.log('🔍 Attempting RS256 verification...');
           // Try RS256 verification for other algorithms
+          // This would be a legitimate login, so don't log as an attempt
           decoded = jwt.verify(token, publicKey, {
             algorithms: ['RS256']
           });
@@ -71,6 +96,8 @@ export async function POST(request: NextRequest) {
         }
       } catch (err) {
         console.log('❌ Verification error:', err);
+        // Not using the HS256 vulnerability, so list it as brute force T1110
+        await logAttempt(request, false, TECHNIQUE_APPLICATION_ACCESS_TOKEN)
         return NextResponse.json(
           { error: 'Invalid token' },
           { status: 401 }
@@ -83,6 +110,7 @@ export async function POST(request: NextRequest) {
           algorithms: ['RS256'] // Whitelist only secure algorithm
         });
       } catch {
+        await logAttempt(request, false)
         return NextResponse.json(
           { error: 'Invalid token' },
           { status: 401 }
@@ -90,20 +118,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const attacker_id = request.headers.get('x-forwarded-for')?.split(',')[0] ||
-      request.headers.get('x-real-ip') ||
-      'unknown';
-
-    // Log successful attack if HS256 was used
-    if (isAttackAttempt || algorithmUsed === 'HS256') {
-      console.log('🚨 Logging attack to honeypot...');
-      await logHoneypotTrigger({
-        vulnerability_type: 'jwt-algorithm-confusion',
-        base_url: process.env.VERCEL_PROJECT_PRODUCTION_URL ?? 'http://localhost:3000',
-        technique_id: 'T1212', // Expoloitation for Credential Access
-        attacker_id,
-        session_id: getSessionId(request),
-      });
+    if (algorithmUsed === 'HS256') {
+      // If they got here and the alg was HS256, it was a success
+      await logAttempt(request, true);
+    } else {
+      // Unlikely, but if they guesses credentials, mark it as brute force success
+      await logAttempt(request, true, TECHNIQUE_BRUTE_FORCE)
     }
 
     return NextResponse.json({
