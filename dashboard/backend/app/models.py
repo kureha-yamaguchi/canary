@@ -13,6 +13,8 @@ class VulnerabilityLog(BaseModel):
     timestamp: datetime
     attacker_id: str
     session_id: str
+    is_synthetic: Optional[bool] = None
+    success: Optional[bool] = None
     
     class Config:
         from_attributes = True
@@ -36,8 +38,13 @@ class Attack(BaseModel):
     @classmethod
     def from_vulnerability_log(cls, log: dict):
         """Convert vulnerability_log to Attack"""
-        # Determine success based on vulnerability_type
-        success = "correct" in log.get("vulnerability_type", "").lower()
+        # Use success column from database, fallback to vulnerability_type inference if NULL
+        success_db = log.get("success")
+        if success_db is not None:
+            success = bool(success_db)
+        else:
+            # Fallback: infer from vulnerability_type (for backward compatibility)
+            success = "correct" in log.get("vulnerability_type", "").lower()
         
         # Determine attack vector from vulnerability type
         vuln_type = log.get("vulnerability_type", "")

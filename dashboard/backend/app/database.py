@@ -126,6 +126,22 @@ class SupabaseQueryBuilder:
         self.param_counter += 1
         return self
     
+    def is_null(self, column: str, null: bool = True):
+        """Add IS NULL or IS NOT NULL condition"""
+        if null:
+            self.conditions.append(f"{column} IS NULL")
+        else:
+            self.conditions.append(f"{column} IS NOT NULL")
+        return self
+    
+    def neq(self, column: str, value):
+        """Not equal condition"""
+        placeholder = f"${self.param_counter}"
+        self.conditions.append(f"{column} != {placeholder}")
+        self.params.append(value)
+        self.param_counter += 1
+        return self
+    
     def gte(self, column: str, value):
         placeholder = f"${self.param_counter}"
         self.conditions.append(f"{column} >= {placeholder}")

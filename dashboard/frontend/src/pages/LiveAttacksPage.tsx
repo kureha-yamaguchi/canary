@@ -3,6 +3,7 @@ import { RealTimeFeed } from '../components/RealTimeFeed'
 import { StatsOverview } from '../components/StatsOverview'
 import { KeyMetrics } from '../components/KeyMetrics'
 import { AttackFilters } from '../components/AttackFilters'
+import { SyntheticDataToggle } from '../components/SyntheticDataToggle'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { Attack, Stats } from '../types'
 
@@ -12,6 +13,7 @@ export function LiveAttacksPage() {
   const [attacks, setAttacks] = useState<Attack[]>([])
   const [filteredAttacks, setFilteredAttacks] = useState<Attack[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
+  const [includeSynthetic, setIncludeSynthetic] = useState(false)
   const wsUrl = API_BASE.replace(/^http/, 'ws')
   const { lastMessage, readyState } = useWebSocket(`${wsUrl}/ws`)
 
@@ -37,7 +39,8 @@ export function LiveAttacksPage() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/stats`)
+      const url = `${API_BASE}/api/stats?include_synthetic=${includeSynthetic}`
+      const response = await fetch(url)
       const data = await response.json()
       setStats(data)
     } catch (error) {
@@ -45,32 +48,34 @@ export function LiveAttacksPage() {
     }
   }
 
+  const fetchAttacks = async () => {
+    try {
+      const url = `${API_BASE}/api/attacks?limit=1000&include_synthetic=${includeSynthetic}`
+      const response = await fetch(url)
+      const attacksData = await response.json()
+      setAttacks(attacksData)
+      setFilteredAttacks(attacksData)
+    } catch (error) {
+      console.error('Error fetching attacks:', error)
+    }
+  }
+
   // Fetch initial data
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [attacksRes, statsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/attacks?limit=1000`), // Fetch more for filtering
-          fetch(`${API_BASE}/api/stats`)
-        ])
-        
-        const attacksData = await attacksRes.json()
-        const statsData = await statsRes.json()
-        
-        setAttacks(attacksData)
-        setFilteredAttacks(attacksData) // Initially show all attacks
-        setStats(statsData)
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      }
-    }
-
-    fetchData()
+    fetchStats()
+    fetchAttacks()
+    
     const interval = setInterval(() => {
       fetchStats()
     }, 30000) // Refresh every 30s
     return () => clearInterval(interval)
   }, [])
+
+  // Refetch when synthetic toggle changes
+  useEffect(() => {
+    fetchStats()
+    fetchAttacks()
+  }, [includeSynthetic])
 
   // Extract unique values for filter dropdowns
   const filterStats = stats ? {
@@ -87,6 +92,14 @@ export function LiveAttacksPage() {
 
   return (
     <div className="space-y-8">
+      {/* Synthetic Data Toggle */}
+      <div className="flex justify-end">
+        <SyntheticDataToggle 
+          includeSynthetic={includeSynthetic}
+          onToggle={setIncludeSynthetic}
+        />
+      </div>
+
       {/* Key Metrics at Top */}
       {stats && <KeyMetrics stats={stats} />}
 
