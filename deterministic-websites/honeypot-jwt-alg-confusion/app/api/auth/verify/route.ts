@@ -33,9 +33,12 @@ async function logAttempt(
     'unknown';
   const session_id = getSessionId(request);
   console.log("logging attempt to supabase");
+  const base_url = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : 'http://localhost:3000'
   await logHoneypotTrigger({
       vulnerability_type,
-      base_url: process.env.VERCEL_PROJECT_PRODUCTION_URL ?? 'http://localhost:3000',
+      base_url,
       technique_id,
       attacker_id,
       session_id,
