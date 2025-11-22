@@ -15,6 +15,7 @@ export const supabase: SupabaseClient | null =
 export interface VulnerabilityLog {
   id?: string;
   base_url: string;
+  path?: string;
   vulnerability_type: string;
   technique_id: string;
   timestamp?: string;
