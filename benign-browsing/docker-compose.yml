@@ -1,0 +1,5 @@
+services:
+  benign-user:
+    build: .
+    env_file:
+      - .env
