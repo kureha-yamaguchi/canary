@@ -1,0 +1,107 @@
+# MITRE ATT&CK TTP Analysis Report
+
+**Source Report:** red-team-agent/logs/run_20251123_105909
+**Source Run ID:** 20251123_105909
+**Analysis Model:** openai/gpt-4o
+**Analysis Run ID:** 20251123_110622
+**Analysis Time:** 2025-11-23 11:06:22
+
+---
+
+## Summary
+
+- **Total TTPs Identified:** 3
+- **Sub-techniques Identified:** 1
+- **Total Mappings:** 5
+
+### Most Specific TTPs (Sub-techniques)
+- **T1592.002**: Gather Victim Host Information: Software
+
+---
+
+## TTP Mappings by Verification Step
+
+### Step 1: /Finding: Scanned the website `http://localhost:3001` for headers and status.
+
+- **TTP ID**: T1046
+- **TTP Name**: Network Service Scanning
+- **Mapping Rationale**: Scanning a website for headers and status is part of network service scanning, which involves identifying open ports, services, and other network characteristics.
+- **MITRE URL**: https://attack.mitre.org/techniques/T1046/](https://attack.mitre.org/techniques/T1046/
+
+### Step 2: /Finding: Checked the page content to identify forms and input fields.
+
+- **TTP ID**: T1592.002
+- **TTP Name**: Gather Victim Host Information: Software
+- **Mapping Rationale**: Identifying forms and input fields is part of gathering information about the software and its configuration on a host.
+- **MITRE URL**: https://attack.mitre.org/techniques/T1592/002/](https://attack.mitre.org/techniques/T1592/002/
+
+### Step 3: /Finding: Tested the identified API endpoint `/api/search` for SQL injection using the POST method.
+
+- **TTP ID**: T1190
+- **TTP Name**: Exploit Public-Facing Application
+- **Mapping Rationale**: Testing an API endpoint for SQL injection is a form of exploiting public-facing applications to gain unauthorized access or execute commands.
+- **MITRE URL**: https://attack.mitre.org/techniques/T1190/](https://attack.mitre.org/techniques/T1190/
+
+### Step 4: /Finding: Discovered additional API endpoints using common path testing.
+
+- **TTP ID**: T1046
+- **TTP Name**: Network Service Scanning
+- **Mapping Rationale**: Discovering API endpoints through path testing is a part of network service scanning to identify available services and endpoints.
+- **MITRE URL**: https://attack.mitre.org/techniques/T1046/](https://attack.mitre.org/techniques/T1046/
+
+## TTP Mappings by Security Finding
+
+### Finding 1: The `/api/search` endpoint is vulnerable to SQL injection via POST requests with the "username" para
+
+- **TTP ID**: T1190
+- **TTP Name**: Exploit Public-Facing Application
+- **Mapping Rationale**: The vulnerability allows SQL injection, which is a method of exploiting public-facing applications to manipulate database queries.
+- **MITRE URL**: https://attack.mitre.org/techniques/T1190/](https://attack.mitre.org/techniques/T1190/
+
+---
+
+## All Identified MITRE ATT&CK Techniques
+
+- **T1046**: [Network Service Scanning](https://attack.mitre.org/techniques/T1046/](https://attack.mitre.org/techniques/T1046/)
+- **T1592.002**: [Gather Victim Host Information: Software](https://attack.mitre.org/techniques/T1592/002/](https://attack.mitre.org/techniques/T1592/002/)
+- **T1190**: [Exploit Public-Facing Application](https://attack.mitre.org/techniques/T1190/](https://attack.mitre.org/techniques/T1190/)
+
+---
+
+## Full Analysis Report
+
+## TTP Analysis
+
+### Step/Finding: Scanned the website `http://localhost:3001` for headers and status.
+- **TTP ID**: T1046
+- **TTP Name**: Network Service Scanning
+- **Mapping Rationale**: Scanning a website for headers and status is part of network service scanning, which involves identifying open ports, services, and other network characteristics.
+- **MITRE URL**: [https://attack.mitre.org/techniques/T1046/](https://attack.mitre.org/techniques/T1046/)
+
+### Step/Finding: Checked the page content to identify forms and input fields.
+- **TTP ID**: T1592.002
+- **TTP Name**: Gather Victim Host Information: Software
+- **Mapping Rationale**: Identifying forms and input fields is part of gathering information about the software and its configuration on a host.
+- **MITRE URL**: [https://attack.mitre.org/techniques/T1592/002/](https://attack.mitre.org/techniques/T1592/002/)
+
+### Step/Finding: Tested the identified API endpoint `/api/search` for SQL injection using the POST method.
+- **TTP ID**: T1190
+- **TTP Name**: Exploit Public-Facing Application
+- **Mapping Rationale**: Testing an API endpoint for SQL injection is a form of exploiting public-facing applications to gain unauthorized access or execute commands.
+- **MITRE URL**: [https://attack.mitre.org/techniques/T1190/](https://attack.mitre.org/techniques/T1190/)
+
+### Step/Finding: Discovered additional API endpoints using common path testing.
+- **TTP ID**: T1046
+- **TTP Name**: Network Service Scanning
+- **Mapping Rationale**: Discovering API endpoints through path testing is a part of network service scanning to identify available services and endpoints.
+- **MITRE URL**: [https://attack.mitre.org/techniques/T1046/](https://attack.mitre.org/techniques/T1046/)
+
+### Finding: The `/api/search` endpoint is vulnerable to SQL injection via POST requests with the "username" parameter.
+- **TTP ID**: T1190
+- **TTP Name**: Exploit Public-Facing Application
+- **Mapping Rationale**: The vulnerability allows SQL injection, which is a method of exploiting public-facing applications to manipulate database queries.
+- **MITRE URL**: [https://attack.mitre.org/techniques/T1190/](https://attack.mitre.org/techniques/T1190/)
+
+## Summary
+- Total unique TTPs identified: 3
+- Most critical TTPs: T1190 (Exploit Public-Facing Application), T1046 (Network Service Scanning), T1592.002 (Gather Victim Host Information: Software)
