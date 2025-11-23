@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import UserTracker from "@/components/UserTracker";
 
 const ibmPlexMono = IBM_Plex_Mono({
   weight: ["400", "500", "600", "700"],
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body
         className={`${ibmPlexMono.variable} ${jetbrainsMono.variable} antialiased bg-cream dark:bg-charcoal text-charcoal dark:text-cream`}
       >
+        <UserTracker />
         {children}
       </body>
     </html>
