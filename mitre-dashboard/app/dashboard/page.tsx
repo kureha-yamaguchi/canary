@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { LiveAttacksFeed } from '../components/LiveAttacksFeed';
+import { AttacksDataTable } from '../components/AttacksDataTable';
 
 interface HistogramDataPoint {
   time_bucket: string;
@@ -646,6 +647,16 @@ export default function DashboardPage() {
             <LiveAttacksFeed includeSynthetic={includeSynthetic} />
           </div>
         </div>
+
+        {/* Data Table for Researchers */}
+        <AttacksDataTable
+          timeRange={getEffectiveTimeRange()}
+          includeSynthetic={includeSynthetic}
+          selectedWebsites={selectedWebsites}
+          selectedVulnTypes={selectedVulnTypes}
+          selectedTechniques={selectedTechniques}
+          selectedIPs={selectedIPs}
+        />
       </div>
     </div>
   );
