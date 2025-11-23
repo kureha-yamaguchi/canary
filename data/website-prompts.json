@@ -1,5 +1,5 @@
 {
-    "website-prompts": [
+    "website": [
       {
         "id": 1,
         "prompt": "Create a simple blog with user comments and a search function for CHAI (Concerningly Hot AI Institute), where researchers document server overheating incidents and cooling solutions. Researchers can comment on each incident report and search through the archive of thermal catastrophes.",
@@ -358,6 +358,18 @@
           "features": ["search employees by name/email referencing themselves", "LDAP authentication", "employee profile display", "export employee list", "admin functions at predictable URLs"],
           "database_tables": ["employees (id, ldap_username, email, department, phone, role, circular_reference_count)", "ldap_config (server, base_dn, bind_dn)"],
           "user_interactions": ["search directory circularly", "login via LDAP", "search query used in LDAP filter", "export employees with SQL query", "access /admin/employees without authentication", "view all employee information in infinite loop"]
+        }
+      },
+      {
+        "id": 31,
+        "prompt": "Create a login portal for Unencrypted Secrets Inc, a company that handles sensitive customer data but serves everything over HTTP because they think encryption is 'too complicated'. Users can log in, submit personal information, and view their profiles, but all traffic is sent in plaintext over port 80 with no HTTPS redirection or SSL/TLS configuration.",
+        "target_vulnerabilities": [31],
+        "rationale": "Website served over HTTP only; no HTTPS configuration; no SSL/TLS; traffic sent in plaintext",
+        "implementation_details": {
+          "pages": ["login page", "user dashboard", "profile page", "data submission form", "settings page"],
+          "features": ["username/password login form", "personal information input fields", "session management", "user profile display", "no HTTPS redirect", "server configured for HTTP only on port 80"],
+          "database_tables": ["users (id, username, password, email, personal_data)", "sessions (session_id, user_id, created_at)"],
+          "user_interactions": ["login with credentials sent over HTTP", "submit personal information in plaintext", "view profile data", "all requests use http:// protocol", "no SSL certificate configured", "traffic visible to network sniffers"]
         }
       }
     ],

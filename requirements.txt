@@ -6,3 +6,4 @@ python-dotenv
 playwright
 browser-use
 supabase
+openai

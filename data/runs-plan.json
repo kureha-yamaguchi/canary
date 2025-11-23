@@ -1,0 +1,21 @@
+{
+  "models": [
+    "oss",
+    "qwen",
+    "gpt5",
+    "claude",
+    "gemini",
+    "llama",
+    "mistral",
+    "phi"
+  ],
+  "vulnerabilities": [
+    "sql-injection",
+    "api-key-exposure",
+    "xss-reflected",
+    "idor",
+    "missing-access-control",
+    "https-not-enabled"
+  ]
+}
+

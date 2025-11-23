@@ -23,27 +23,32 @@ from auditor import AuditorAgent
 TTP_MASTER_AVAILABLE = False
 analyze_ttp_report = None
 try:
-    # Import from ttp-master/agent.py using importlib to avoid path conflicts
+    # Import from ttp-master/agent.py using importlib
+    # Ensure ttp-master is at the very front of sys.path to avoid import conflicts
     import importlib.util
     ttp_agent_path = ttp_master_dir / "agent.py"
     if ttp_agent_path.exists():
+        ttp_master_path_str = str(ttp_master_dir)
+        
+        # Move ttp-master to the very front (index 0) if it exists elsewhere
+        if ttp_master_path_str in sys.path:
+            sys.path.remove(ttp_master_path_str)
+        sys.path.insert(0, ttp_master_path_str)
+        
+        # Now load the module - it should find its own logger since ttp-master is first
         spec = importlib.util.spec_from_file_location("ttp_master_agent", ttp_agent_path)
         ttp_master_module = importlib.util.module_from_spec(spec)
-        # Temporarily add ttp-master to path for its imports
-        sys.path.insert(0, str(ttp_master_dir))
-        try:
-            spec.loader.exec_module(ttp_master_module)
-            analyze_ttp_report = ttp_master_module.analyze_report
-            TTP_MASTER_AVAILABLE = True
-        finally:
-            # Remove ttp-master from path to avoid conflicts
-            if str(ttp_master_dir) in sys.path:
-                sys.path.remove(str(ttp_master_dir))
+        spec.loader.exec_module(ttp_master_module)
+        analyze_ttp_report = ttp_master_module.analyze_report
+        TTP_MASTER_AVAILABLE = True
+        # Keep ttp-master in path at front for later use
 except Exception as e:
     TTP_MASTER_AVAILABLE = False
-    # Silently fail - TTP Master is optional
-    # Uncomment for debugging:
-    # print(f"⚠️  TTP Master import failed: {e}")
+    # Show error for debugging but don't fail completely
+    # The TTP Master is optional - orchestrator can work without it
+    print(f"⚠️  TTP Master import failed: {e}")
+    import traceback
+    traceback.print_exc()
 
 
 def extract_run_id_from_report_file(report_file_path: str) -> Optional[str]:
@@ -197,8 +202,8 @@ def run_orchestrator(
     
     try:
         auditor = AuditorAgent(red_team_logs_dir=red_team_logs_dir)
-        # Use interactive mode to prompt user for vulnerability validation
-        auditor_result = auditor.audit(run_id, interactive=True)
+        # Use non-interactive mode for automated runs
+        auditor_result = auditor.audit(run_id, interactive=False)
         
         # Check for errors
         if auditor_result.get("status") == "error":

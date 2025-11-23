@@ -22,11 +22,30 @@ try:
     from .logger import TTPLogger
     from .prompts import SYSTEM_PROMPT, get_ttp_analysis_prompt
 except ImportError:
-    # For direct script execution - use absolute imports from ttp-master directory
-    from config import config
-    from logger import TTPLogger
-    # Import prompts with explicit path to avoid conflicts
+    # For direct script execution - use importlib to avoid path conflicts
     import importlib.util
+    
+    # Load config
+    config_path = Path(_ttp_master_dir) / "config.py"
+    if config_path.exists():
+        spec = importlib.util.spec_from_file_location("ttp_config", config_path)
+        config_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(config_module)
+        config = config_module.config
+    else:
+        raise ImportError(f"Could not find config.py in {_ttp_master_dir}")
+    
+    # Load logger with explicit path to avoid conflicts
+    logger_path = Path(_ttp_master_dir) / "logger.py"
+    if logger_path.exists():
+        spec = importlib.util.spec_from_file_location("ttp_logger", logger_path)
+        logger_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(logger_module)
+        TTPLogger = logger_module.TTPLogger
+    else:
+        raise ImportError(f"Could not find logger.py in {_ttp_master_dir}")
+    
+    # Load prompts with explicit path to avoid conflicts
     prompts_path = Path(_ttp_master_dir) / "prompts.py"
     if prompts_path.exists():
         spec = importlib.util.spec_from_file_location("ttp_prompts", prompts_path)

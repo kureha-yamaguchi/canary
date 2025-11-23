@@ -134,9 +134,35 @@ class AuditorAgent:
             # Non-interactive: return the detected vulnerability
             return vuln
     
+    def _extract_vulnerability_id_from_folder_name(self, folder_name: str) -> Optional[int]:
+        """
+        Extract vulnerability ID from folder name.
+        Supports formats:
+        - website-{vuln_id}-{vuln_name}-{site_id}
+        - vulnerability-{vuln_id}-{slug}
+        
+        Args:
+            folder_name: The folder name to parse
+        
+        Returns:
+            Vulnerability ID if found, None otherwise
+        """
+        # Try pattern: website-{vuln_id}-...
+        match = re.search(r'website-(\d+)-', folder_name)
+        if match:
+            return int(match.group(1))
+        
+        # Try pattern: vulnerability-{vuln_id}-...
+        match = re.search(r'vulnerability-(\d+)-', folder_name)
+        if match:
+            return int(match.group(1))
+        
+        return None
+    
     def _detect_vulnerability_from_files(self, website_url: str) -> List[Dict[str, Any]]:
         """
         Detect vulnerability by searching for vulnerability-mapping.txt files in website directories
+        or by extracting vulnerability ID from folder names.
         
         Args:
             website_url: The website URL to match against
@@ -147,6 +173,32 @@ class AuditorAgent:
         detected = []
         
         try:
+            # First, try to extract vulnerability ID from URL or folder structure
+            # Check if we're dealing with multi-website-builder websites
+            # These are in multi-website-builder/websites/website-{vuln_id}-{vuln_name}-{site_id}/
+            multi_website_builder_dir = Path(__file__).parent.parent / "multi-website-builder" / "websites"
+            if multi_website_builder_dir.exists():
+                for website_dir in multi_website_builder_dir.iterdir():
+                    if not website_dir.is_dir():
+                        continue
+                    
+                    # Extract vulnerability ID from folder name
+                    vuln_id = self._extract_vulnerability_id_from_folder_name(website_dir.name)
+                    if vuln_id:
+                        # Load vulnerability details
+                        vuln_details = self.load_vulnerability_details(vuln_id)
+                        if vuln_details:
+                            detected.append({
+                                "vulnerability_id": vuln_id,
+                                "vulnerability_name": vuln_details.get("name", "Unknown"),
+                                "description": vuln_details.get("description", ""),
+                                "website_id": website_dir.name,
+                                "website_name": website_dir.name,
+                                "port": None,
+                                "mitre_techniques": vuln_details.get("mitre_attack", {}),
+                                "mapping_file": None
+                            })
+            
             # Search all directories in deterministic-websites for vulnerability-mapping.txt
             if not self.websites_dir.exists():
                 return detected
@@ -156,6 +208,9 @@ class AuditorAgent:
                 if not website_dir.is_dir():
                     continue
                 
+                # Try to extract vulnerability ID from folder name first
+                vuln_id_from_folder = self._extract_vulnerability_id_from_folder_name(website_dir.name)
+                
                 # Look for vulnerability-mapping.txt in docs/ subdirectory
                 mapping_file = website_dir / "docs" / "vulnerability-mapping.txt"
                 
@@ -163,6 +218,20 @@ class AuditorAgent:
                     # Also check root of website directory
                     mapping_file = website_dir / "vulnerability-mapping.txt"
                     if not mapping_file.exists():
+                        # If we have vuln_id from folder name, use it
+                        if vuln_id_from_folder:
+                            vuln_details = self.load_vulnerability_details(vuln_id_from_folder)
+                            if vuln_details:
+                                detected.append({
+                                    "vulnerability_id": vuln_id_from_folder,
+                                    "vulnerability_name": vuln_details.get("name", "Unknown"),
+                                    "description": vuln_details.get("description", ""),
+                                    "website_id": website_dir.name,
+                                    "website_name": website_dir.name,
+                                    "port": None,
+                                    "mitre_techniques": vuln_details.get("mitre_attack", {}),
+                                    "mapping_file": None
+                                })
                         continue
                 
                 # Read and parse the mapping file
@@ -175,24 +244,36 @@ class AuditorAgent:
                     vuln_name_match = re.search(r'Name:\s*["\']?([^"\'\n]+)', mapping_content, re.IGNORECASE)
                     description_match = re.search(r'Description:\s*([^\n]+)', mapping_content, re.IGNORECASE)
                     
-                    if vuln_id_match:
+                    # Use ID from folder name if available, otherwise from mapping file
+                    if vuln_id_from_folder:
+                        vulnerability_id = vuln_id_from_folder
+                    elif vuln_id_match:
                         vulnerability_id = int(vuln_id_match.group(1))
-                        vulnerability_name = vuln_name_match.group(1).strip().strip('"\'') if vuln_name_match else "Unknown"
-                        description = description_match.group(1).strip() if description_match else ""
-                        
-                        # Try to get additional info from registry
-                        website_info = self._get_website_info_from_registry(website_dir.name)
-                        
-                        detected.append({
-                            "vulnerability_id": vulnerability_id,
-                            "vulnerability_name": vulnerability_name,
-                            "description": description or website_info.get("description", ""),
-                            "website_id": website_info.get("id", website_dir.name),
-                            "website_name": website_info.get("name", website_dir.name),
-                            "port": website_info.get("port"),
-                            "mitre_techniques": website_info.get("mitre_techniques", []),
-                            "mapping_file": str(mapping_file)
-                        })
+                    else:
+                        continue
+                    
+                    vulnerability_name = vuln_name_match.group(1).strip().strip('"\'') if vuln_name_match else "Unknown"
+                    description = description_match.group(1).strip() if description_match else ""
+                    
+                    # Load full vulnerability details if we have the ID
+                    vuln_details = self.load_vulnerability_details(vulnerability_id)
+                    if vuln_details:
+                        vulnerability_name = vuln_details.get("name", vulnerability_name)
+                        description = vuln_details.get("description", description)
+                    
+                    # Try to get additional info from registry
+                    website_info = self._get_website_info_from_registry(website_dir.name)
+                    
+                    detected.append({
+                        "vulnerability_id": vulnerability_id,
+                        "vulnerability_name": vulnerability_name,
+                        "description": description or website_info.get("description", ""),
+                        "website_id": website_info.get("id", website_dir.name),
+                        "website_name": website_info.get("name", website_dir.name),
+                        "port": website_info.get("port"),
+                        "mitre_techniques": website_info.get("mitre_techniques", []),
+                        "mapping_file": str(mapping_file)
+                    })
                 except Exception as e:
                     # Skip files that can't be read or parsed
                     continue
