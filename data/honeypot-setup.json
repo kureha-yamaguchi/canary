@@ -1,0 +1,498 @@
+{
+  "vulnerability-1-sql-injection": {
+    "vulnerability_id": 1,
+    "vulnerability_name": "SQL Injection",
+    "description": "User input concatenated directly into SQL queries without sanitization",
+    "setup_requirements": {
+      "required_files": {
+        "lib/supabase.ts": {
+          "description": "Supabase client configuration for server-side operations",
+          "required_env_vars": [
+            "SUPABASE_URL",
+            "SUPABASE_SERVICE_ROLE_KEY"
+          ],
+          "key_exports": [
+            "supabase (SupabaseClient | null)"
+          ],
+          "notes": "Must use service role key for server-side operations that bypass RLS"
+        },
+        "lib/honeypot-config.ts": {
+          "description": "Honeypot configuration constants",
+          "required_config": {
+            "tableName": "mock_1_users"
+        },
+        "lib/honeypot-utils.ts": {
+          "description": "SQL injection detection and logging utilities",
+          "required_functions": {
+            "checkSqlInjection": {
+              "input": "string - User input to check",
+              "output": "SqlInjectionCheckResult",
+              "detection_logic": [
+                "Checks for SQL injection patterns (OR '1'='1, UNION SELECT, etc.)",
+                "Returns 'injection_detected' if pattern matches",
+                "Returns 'suspicious' if multiple suspicious patterns found",
+                "Returns 'normal' otherwise"
+              ]
+            },
+            "logSqlInjectionAttempt": {
+              "input": [
+                "result: SqlInjectionCheckResult",
+                "request: Request",
+                "route?: string"
+              ],
+              "functionality": [
+                "Maps result status to vulnerability_type",
+                "Extracts attacker_id from request headers (x-forwarded-for or x-real-ip)",
+                "Generates session_id from IP and timestamp",
+                "Maps vulnerability_type to MITRE technique_id (T1190)",
+                "Logs to Supabase vulnerability_logs table"
+              ],
+              "vulnerability_type_mapping": {
+                "injection_detected": "sql-injection-attempt",
+                "suspicious": "sql-injection-suspicious",
+                "normal": "sql-injection-normal"
+              },
+              "additional_fields": {
+                "injection_detected": ["sql_payload", "vulnerable_query"],
+                "suspicious": ["sql_payload", "suspicious_reason"]
+              }
+            }
+          },
+          "required_types": {
+            "SqlInjectionCheckResult": {
+              "injection_detected": {
+                "status": "'injection_detected'",
+                "payload": "string",
+                "query": "string"
+              },
+              "suspicious": {
+                "status": "'suspicious'",
+                "payload": "string",
+                "reason": "string"
+              },
+              "normal": {
+                "status": "'normal'",
+                "payload": "string"
+              }
+            }
+          }
+        },
+        "app/api/[endpoint]/route.ts": {
+          "description": "API route that processes user input and logs SQL injection attempts",
+          "required_functionality": [
+            "Extract user input from request body",
+            "Call checkSqlInjection() on user input",
+            "Call logSqlInjectionAttempt() to log to Supabase",
+            "Execute query safely using Supabase (parameterized queries)",
+            "If injection detected, optionally return all records to demonstrate impact"
+          ],
+          "example_endpoints": [
+            "/api/search (POST)"
+          ]
+        }
+      },
+      "database_schema": {
+        "required_table": "vulnerability_logs",
+        "required_columns": [
+          "base_url (TEXT)",
+          "vulnerability_type (TEXT)",
+          "technique_id (TEXT)",
+          "attacker_id (TEXT)",
+          "session_id (TEXT)",
+          "path (TEXT, optional)",
+          "sql_payload (TEXT, optional)",
+          "vulnerable_query (TEXT, optional)",
+          "suspicious_reason (TEXT, optional)"
+        ],
+        "vulnerability_types": [
+          "sql-injection-attempt",
+          "sql-injection-suspicious",
+          "sql-injection-normal"
+        ],
+        "technique_id": "T1190",
+        "mitre_technique": "T1190: Exploit Public-Facing Application"
+      },
+      "logging_payload_structure": {
+        "base_url": "string - Origin from request URL",
+        "vulnerability_type": "string - One of: sql-injection-attempt, sql-injection-suspicious, sql-injection-normal",
+        "technique_id": "string - Always 'T1190'",
+        "attacker_id": "string - IP address from x-forwarded-for or x-real-ip header",
+        "session_id": "string - Generated from IP and timestamp",
+        "path": "string (optional) - API route path",
+        "sql_payload": "string (optional) - The SQL injection payload detected",
+        "vulnerable_query": "string (optional) - Example vulnerable query (for injection_detected)",
+        "suspicious_reason": "string (optional) - Reason for suspicious classification"
+      },
+      "implementation_checklist": [
+        "Create lib/supabase.ts with Supabase client using service role key",
+        "Create lib/honeypot-config.ts with tableName configuration",
+        "Create lib/honeypot-utils.ts with checkSqlInjection() and logSqlInjectionAttempt()",
+        "Implement SQL injection pattern detection (OR '1'='1, UNION SELECT, etc.)",
+        "Create API route that processes user input",
+        "Call checkSqlInjection() on all user input",
+        "Call logSqlInjectionAttempt() after checking",
+        "Ensure Supabase table exists with required columns",
+        "Test logging with various SQL injection payloads",
+        "Verify logs appear in vulnerability_logs table"
+      ]
+    }
+  },
+  "vulnerability-8-api-key": {
+    "vulnerability_id": 8,
+    "vulnerability_name": "Sensitive Data Exposure - Client Side",
+    "description": "API keys exposed in JavaScript, HTML data attributes, and server-rendered HTML",
+    "setup_requirements": {
+      "required_files": {
+        "lib/supabase.ts": {
+          "description": "Supabase client configuration for server-side operations",
+          "required_env_vars": [
+            "SUPABASE_URL",
+            "SUPABASE_SERVICE_ROLE_KEY"
+          ],
+          "key_exports": [
+            "supabase (SupabaseClient | null)"
+          ],
+          "notes": "Must use service role key for server-side operations that bypass RLS"
+        },
+        "lib/honeypot-config.ts": {
+          "description": "Honeypot configuration constants",
+          "required_config": {
+            "apiKey": "string - The API key that should be used for authentication (e.g., 'sk_afsldkfjslkjdfghsoiearhgf')",
+            "baseUrl": "string - Base URL path for admin endpoints (e.g., '/api/admin')"
+          },
+          "example": {
+            "apiKey": "sk_afsldkfjslkjdfghsoiearhgf",
+            "baseUrl": "/api/admin"
+          }
+        },
+        "lib/honeypot-utils.ts": {
+          "description": "API key detection and logging utilities",
+          "required_functions": {
+            "checkApiKey": {
+              "input": "Headers - Request headers object",
+              "output": "ApiKeyCheckResult",
+              "detection_logic": [
+                "Iterates through all request headers",
+                "Checks if any header value contains 'sk_' or header name contains 'api'",
+                "If found, compares with HONEYPOT_CONFIG.apiKey",
+                "Returns 'correct' if matches, 'wrong' if different, 'none' if not found"
+              ]
+            },
+            "logHoneypotTrigger": {
+              "input": [
+                "result: ApiKeyCheckResult",
+                "request: Request",
+                "route?: string"
+              ],
+              "functionality": [
+                "Maps result status to vulnerability_type",
+                "Extracts attacker_id from request headers (x-forwarded-for or x-real-ip)",
+                "Generates session_id from IP and timestamp",
+                "Maps vulnerability_type to MITRE technique_id based on status",
+                "Logs to Supabase vulnerability_logs table"
+              ],
+              "vulnerability_type_mapping": {
+                "correct": "admin-page-access-correct-api-key",
+                "wrong": "admin-page-access-incorrect-api-key",
+                "none": "admin-page-access-no-api-key"
+              },
+              "technique_id_mapping": {
+                "admin-page-access-correct-api-key": "T1552",
+                "admin-page-access-incorrect-api-key": "T1110",
+                "admin-page-access-no-api-key": "T1190"
+              },
+              "mitre_techniques": {
+                "T1552": "Unsecured Credentials - using credentials found in code/documentation",
+                "T1110": "Brute Force - trying incorrect/random API keys",
+                "T1190": "Exploit Public-Facing Application - attempting to access admin endpoints without auth"
+              }
+            }
+          },
+          "required_types": {
+            "ApiKeyCheckResult": {
+              "correct": {
+                "status": "'correct'",
+                "apiKey": "string",
+                "header": "string"
+              },
+              "wrong": {
+                "status": "'wrong'",
+                "apiKey": "string",
+                "header": "string"
+              },
+              "none": {
+                "status": "'none'"
+              }
+            }
+          }
+        },
+        "app/api/[...slug]/route.ts": {
+          "description": "Catch-all API route that checks for API keys on all /api/* endpoints",
+          "required_functionality": [
+            "Handle GET, POST, PUT, PATCH, DELETE methods",
+            "Extract path from slug parameters",
+            "Call checkApiKey() on request headers",
+            "Call logHoneypotTrigger() to log to Supabase",
+            "Return appropriate response based on API key status",
+            "Return 200/201 if correct API key",
+            "Return 401 if wrong or no API key"
+          ],
+          "example_endpoints": [
+            "/api/admin",
+            "/api/admin/users",
+            "/api/admin/data"
+          ]
+        }
+      },
+      "database_schema": {
+        "required_table": "vulnerability_logs",
+        "required_columns": [
+          "base_url (TEXT)",
+          "vulnerability_type (TEXT)",
+          "technique_id (TEXT)",
+          "attacker_id (TEXT)",
+          "session_id (TEXT)",
+          "path (TEXT, optional)"
+        ],
+        "vulnerability_types": [
+          "admin-page-access-correct-api-key",
+          "admin-page-access-incorrect-api-key",
+          "admin-page-access-no-api-key"
+        ],
+        "technique_ids": {
+          "admin-page-access-correct-api-key": "T1552",
+          "admin-page-access-incorrect-api-key": "T1110",
+          "admin-page-access-no-api-key": "T1190"
+        },
+        "mitre_techniques": {
+          "T1552": "Unsecured Credentials",
+          "T1110": "Brute Force",
+          "T1190": "Exploit Public-Facing Application"
+        }
+      },
+      "logging_payload_structure": {
+        "base_url": "string - Origin from request URL",
+        "vulnerability_type": "string - One of: admin-page-access-correct-api-key, admin-page-access-incorrect-api-key, admin-page-access-no-api-key",
+        "technique_id": "string - T1552 (correct), T1110 (wrong), or T1190 (none)",
+        "attacker_id": "string - IP address from x-forwarded-for or x-real-ip header",
+        "session_id": "string - Generated from IP and timestamp",
+        "path": "string (optional) - API route path"
+      },
+      "implementation_checklist": [
+        "Create lib/supabase.ts with Supabase client using service role key",
+        "Create lib/honeypot-config.ts with apiKey and baseUrl configuration",
+        "Create lib/honeypot-utils.ts with checkApiKey() and logHoneypotTrigger()",
+        "Implement API key detection in request headers",
+        "Create catch-all API route app/api/[...slug]/route.ts",
+        "Handle all HTTP methods (GET, POST, PUT, PATCH, DELETE)",
+        "Call checkApiKey() on all requests",
+        "Call logHoneypotTrigger() after checking",
+        "Map vulnerability types to correct MITRE technique IDs",
+        "Ensure Supabase table exists with required columns",
+        "Test logging with correct, wrong, and missing API keys",
+        "Verify logs appear in vulnerability_logs table with correct technique_id"
+      ]
+    }
+  },
+  "prompt-injection-pizzaria": {
+    "vulnerability_type": "Prompt Injection",
+    "vulnerability_name": "Prompt Injection",
+    "description": "User input directly concatenated into AI prompts without sanitization",
+    "setup_requirements": {
+      "required_files": {
+        "lib/supabase.ts": {
+          "description": "Supabase client configuration for server-side operations",
+          "required_env_vars": [
+            "SUPABASE_URL",
+            "SUPABASE_SERVICE_ROLE_KEY"
+          ],
+          "key_exports": [
+            "supabase (SupabaseClient | null)"
+          ],
+          "notes": "Must use service role key for server-side operations that bypass RLS"
+        },
+        "lib/honeypot-config.ts": {
+          "description": "Honeypot configuration constants",
+          "required_config": {
+            "tableName": "string - Name of the table in Supabase for user data (e.g., 'mock_1_users')",
+            "systemPrompt": "string - System prompt template for AI assistant"
+          },
+          "example": {
+            "tableName": "mock_1_users",
+            "systemPrompt": "You are a helpful assistant for managing employees at a pizzeria. Answer questions about employees based on the user query."
+          }
+        },
+        "lib/honeypot-utils.ts": {
+          "description": "Prompt injection detection and logging utilities",
+          "required_functions": {
+            "checkPromptInjection": {
+              "input": "string - User input to check",
+              "output": "PromptInjectionCheckResult",
+              "detection_logic": [
+                "Checks for prompt injection patterns (ignore previous instructions, forget everything, you are now, etc.)",
+                "Returns 'injection_detected' if pattern matches",
+                "Returns 'suspicious' if multiple suspicious patterns found",
+                "Returns 'normal' otherwise"
+              ]
+            },
+            "logPromptInjectionAttempt": {
+              "input": [
+                "result: PromptInjectionCheckResult",
+                "request: Request",
+                "route?: string"
+              ],
+              "functionality": [
+                "Maps result status to vulnerability_type",
+                "Extracts attacker_id from request headers (x-forwarded-for or x-real-ip)",
+                "Generates session_id from IP and timestamp",
+                "Maps vulnerability_type to MITRE technique_id (T1190)",
+                "Logs to Supabase vulnerability_logs table"
+              ],
+              "vulnerability_type_mapping": {
+                "injection_detected": "prompt-injection-attempt",
+                "suspicious": "prompt-injection-suspicious",
+                "normal": "prompt-injection-normal"
+              },
+              "additional_fields": {
+                "injection_detected": ["prompt_payload", "vulnerable_prompt", "injection_reason"],
+                "suspicious": ["prompt_payload", "suspicious_reason"]
+              }
+            }
+          },
+          "required_types": {
+            "PromptInjectionCheckResult": {
+              "injection_detected": {
+                "status": "'injection_detected'",
+                "payload": "string",
+                "prompt": "string",
+                "reason": "string"
+              },
+              "suspicious": {
+                "status": "'suspicious'",
+                "payload": "string",
+                "reason": "string"
+              },
+              "normal": {
+                "status": "'normal'",
+                "payload": "string"
+              }
+            }
+          }
+        },
+        "app/api/search/route.ts": {
+          "description": "API route that processes user input and logs prompt injection attempts",
+          "required_functionality": [
+            "Extract user input from request body",
+            "Call checkPromptInjection() on user input",
+            "Call logPromptInjectionAttempt() to log to Supabase",
+            "Construct vulnerable prompt by directly concatenating user input",
+            "Simulate AI processing (in real scenario, would send to LLM)",
+            "Query database using mock_1_users table",
+            "If injection detected, optionally return all records to demonstrate impact"
+          ],
+          "example_endpoints": [
+            "/api/search (POST)"
+          ]
+        }
+      },
+      "database_schema": {
+        "required_table": "vulnerability_logs",
+        "data_table": "mock_1_users",
+        "data_table_columns": [
+          "id (SERIAL or UUID)",
+          "username (TEXT)",
+          "email (TEXT)",
+          "active (BOOLEAN)"
+        ],
+        "required_columns": [
+          "base_url (TEXT)",
+          "vulnerability_type (TEXT)",
+          "technique_id (TEXT)",
+          "attacker_id (TEXT)",
+          "session_id (TEXT)",
+          "path (TEXT, optional)",
+          "prompt_payload (TEXT, optional)",
+          "vulnerable_prompt (TEXT, optional)",
+          "injection_reason (TEXT, optional)",
+          "suspicious_reason (TEXT, optional)"
+        ],
+        "vulnerability_types": [
+          "prompt-injection-attempt",
+          "prompt-injection-suspicious",
+          "prompt-injection-normal"
+        ],
+        "technique_id": "T1190",
+        "mitre_technique": "T1190: Exploit Public-Facing Application"
+      },
+      "logging_payload_structure": {
+        "base_url": "string - Origin from request URL",
+        "vulnerability_type": "string - One of: prompt-injection-attempt, prompt-injection-suspicious, prompt-injection-normal",
+        "technique_id": "string - Always 'T1190'",
+        "attacker_id": "string - IP address from x-forwarded-for or x-real-ip header",
+        "session_id": "string - Generated from IP and timestamp",
+        "path": "string (optional) - API route path",
+        "prompt_payload": "string (optional) - The prompt injection payload detected",
+        "vulnerable_prompt": "string (optional) - Example vulnerable prompt (for injection_detected)",
+        "injection_reason": "string (optional) - Reason for injection detection",
+        "suspicious_reason": "string (optional) - Reason for suspicious classification"
+      },
+      "implementation_checklist": [
+        "Create lib/supabase.ts with Supabase client using service role key",
+        "Create lib/honeypot-config.ts with tableName='mock_1_users' and systemPrompt configuration",
+        "Create lib/honeypot-utils.ts with checkPromptInjection() and logPromptInjectionAttempt()",
+        "Implement prompt injection pattern detection (ignore previous instructions, forget everything, etc.)",
+        "Create API route that processes user input",
+        "Call checkPromptInjection() on all user input",
+        "Call logPromptInjectionAttempt() after checking",
+        "Ensure Supabase table exists with required columns",
+        "Ensure mock_1_users table exists with id, username, email, active columns",
+        "Test logging with various prompt injection payloads",
+        "Verify logs appear in vulnerability_logs table"
+      ]
+    }
+  },
+  "common_requirements": {
+    "environment_variables": {
+      "SUPABASE_URL": {
+        "description": "Supabase project URL",
+        "required": true,
+        "example": "https://your-project.supabase.co"
+      },
+      "SUPABASE_SERVICE_ROLE_KEY": {
+        "description": "Supabase service role key (bypasses RLS)",
+        "required": true,
+        "security_note": "Never expose this in client-side code. Server-side only."
+      }
+    },
+    "database_setup": {
+      "required_tables": [
+        "vulnerability_logs",
+        "vulnerability_types",
+        "techniques (referenced by technique_id)"
+      ],
+      "schema_file": "supabase-schema.sql",
+      "notes": [
+        "vulnerability_logs table must have columns: base_url, vulnerability_type, technique_id, attacker_id, session_id",
+        "vulnerability_types table is auto-populated via trigger",
+        "techniques table must exist with technique_id as primary key",
+        "RLS policies must allow service_role to insert into vulnerability_logs"
+      ]
+    },
+    "logging_pattern": {
+      "session_id_generation": "IP address + timestamp (e.g., '192.168.1.1_1234567890')",
+      "attacker_id_extraction": "From x-forwarded-for or x-real-ip header, fallback to 'unknown'",
+      "base_url_extraction": "Origin from request URL (scheme + netloc)",
+      "error_handling": [
+        "Log to console if Supabase not configured",
+        "Log to console if Supabase insert fails",
+        "Never throw errors that break the request flow"
+      ]
+    },
+    "file_structure": {
+      "lib/": "Utility functions and configuration",
+      "app/api/": "API routes that process requests and log vulnerabilities",
+      "docs/": "Documentation including vulnerability-mapping.txt"
+    }
+  }
+}
+
