@@ -1,14 +1,11 @@
 {
   "models": [
-    "oss",
-    "qwen",
-    "gpt5",
-    "claude",
-    "gemini",
-    "llama",
-    "mistral",
-    "phi"
-  ],
+    "openai/gpt-4o",
+    "anthropic/claude-3.5-sonnet",
+    "qwen/qwen-2.5-72b-instruct",
+    "openai/gpt-oss-120b",
+    "meta-llama/llama-3.3-70b-instruct"
+  ], 
   "vulnerabilities": [
     "sql-injection",
     "api-key-exposure",
@@ -16,6 +13,12 @@
     "idor",
     "missing-access-control",
     "https-not-enabled"
+  ],
+  "urls": [
+    "https://honeypot-nine.vercel.app/",
+    "https://very-secure-website.vercel.app/",
+    "https://honeypot-jwt-alg-confusion.vercel.app/",
+    "https://neuralmarket.vercel.app/"
   ]
 }
 

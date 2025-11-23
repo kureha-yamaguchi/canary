@@ -39,6 +39,7 @@ class AuditorAgent:
         self.vulnerabilities_json = base_dir / "data" / "vulnarabilities.json"
         self.registry_json = base_dir / "deterministic-websites" / "registry.json"
         self.websites_dir = base_dir / "deterministic-websites"
+        self.url_mapping_json = base_dir / "data" / "url-vulnerability-mapping.json"
     
     def load_red_team_report(self, run_id: str) -> Dict[str, Any]:
         """
@@ -89,8 +90,28 @@ class AuditorAgent:
         if not detected_vulns:
             return None
         
-        # If multiple vulnerabilities found, let user choose
+        # If multiple vulnerabilities found, check if they're from URL mapping
         if len(detected_vulns) > 1:
+            # Check if all vulnerabilities are from URL mapping
+            all_from_url_mapping = all(
+                vuln.get('mapping_file', '').startswith('url-mapping:') 
+                for vuln in detected_vulns
+            )
+            
+            if all_from_url_mapping:
+                # For URL mappings with multiple vulnerabilities, return a special structure
+                # that indicates we should check all of them
+                return {
+                    "vulnerability_id": detected_vulns[0].get("vulnerability_id"),  # Use first as primary
+                    "vulnerability_name": f"Multiple vulnerabilities ({len(detected_vulns)})",
+                    "description": f"Multiple vulnerabilities detected: {', '.join([v.get('vulnerability_name', 'Unknown') for v in detected_vulns])}",
+                    "website_id": detected_vulns[0].get("website_id"),
+                    "website_name": detected_vulns[0].get("website_name"),
+                    "all_vulnerabilities": detected_vulns,  # Store all for checking
+                    "mapping_file": detected_vulns[0].get("mapping_file")
+                }
+            
+            # Otherwise, let user choose (for file-based detections)
             if interactive:
                 print("\n🔍 Multiple potential vulnerabilities detected:")
                 for i, vuln in enumerate(detected_vulns, 1):
@@ -134,6 +155,56 @@ class AuditorAgent:
             # Non-interactive: return the detected vulnerability
             return vuln
     
+    def _check_url_mapping(self, website_url: str) -> List[Dict[str, Any]]:
+        """
+        Check if the URL has a manual mapping to vulnerabilities.
+        
+        Args:
+            website_url: The website URL to check
+        
+        Returns:
+            List of detected vulnerability dictionaries, or empty list if no mapping found
+        """
+        detected = []
+        
+        try:
+            if not self.url_mapping_json.exists():
+                return detected
+            
+            with open(self.url_mapping_json, 'r', encoding='utf-8') as f:
+                mapping_data = json.load(f)
+            
+            url_mappings = mapping_data.get("url_mappings", [])
+            parsed_url = urlparse(website_url)
+            url_host = parsed_url.hostname or ""
+            
+            for mapping in url_mappings:
+                url_pattern = mapping.get("url_pattern", "")
+                vulnerability_ids = mapping.get("vulnerability_ids", [])
+                
+                # Check if pattern matches (supports partial hostname matching)
+                if url_pattern in url_host or url_pattern in website_url:
+                    # Load details for each vulnerability ID
+                    for vuln_id in vulnerability_ids:
+                        vuln_details = self.load_vulnerability_details(vuln_id)
+                        if vuln_details:
+                            detected.append({
+                                "vulnerability_id": vuln_id,
+                                "vulnerability_name": vuln_details.get("name", "Unknown"),
+                                "description": vuln_details.get("description", ""),
+                                "website_id": None,
+                                "website_name": url_host,
+                                "port": None,
+                                "mitre_techniques": vuln_details.get("mitre_attack", {}),
+                                "mapping_file": f"url-mapping:{url_pattern}"
+                            })
+                    break  # Only use first matching mapping
+        
+        except Exception:
+            pass
+        
+        return detected
+    
     def _extract_vulnerability_id_from_folder_name(self, folder_name: str) -> Optional[int]:
         """
         Extract vulnerability ID from folder name.
@@ -171,6 +242,11 @@ class AuditorAgent:
             List of detected vulnerability dictionaries
         """
         detected = []
+        
+        # First, check URL mappings (manual overrides)
+        url_mapping_results = self._check_url_mapping(website_url)
+        if url_mapping_results:
+            return url_mapping_results
         
         try:
             # First, try to extract vulnerability ID from URL or folder structure
@@ -546,47 +622,121 @@ class AuditorAgent:
         vulnerability_id = vulnerability_info.get("vulnerability_id")
         vulnerability_name = vulnerability_info.get("vulnerability_name", "Unknown")
         
-        # Load vulnerability mapping and details
-        mapping_text = self.load_vulnerability_mapping(vulnerability_id)
-        vulnerability_details = self.load_vulnerability_details(vulnerability_id)
+        # Check if we have multiple vulnerabilities from URL mapping
+        all_vulnerabilities = vulnerability_info.get("all_vulnerabilities")
         
         # Extract findings from report
         findings = report.get("structured_report", {}).get("findings", [])
         final_report = report.get("final_report", "")
         all_findings_text = ' '.join(findings) + ' ' + final_report
         
-        # Extract keywords from mapping
-        mapping_keywords = []
-        if mapping_text:
-            mapping_keywords = self.extract_keywords_from_mapping(mapping_text)
-        
-        # Check if vulnerability was found
-        found_vulnerability, matching_findings, non_matching_findings = self.check_finding_matches(
-            findings, mapping_keywords, vulnerability_name
-        )
+        # If we have multiple vulnerabilities, check findings against all of them
+        if all_vulnerabilities:
+            all_matching_findings = []
+            all_non_matching_findings = []
+            found_any_vulnerability = False
+            vulnerability_details_list = []
+            
+            for vuln_info in all_vulnerabilities:
+                vuln_id = vuln_info.get("vulnerability_id")
+                vuln_name = vuln_info.get("vulnerability_name", "Unknown")
+                
+                # Load vulnerability details
+                vuln_details = self.load_vulnerability_details(vuln_id)
+                vulnerability_details_list.append(vuln_details)
+                
+                # Load mapping and extract keywords
+                mapping_text = self.load_vulnerability_mapping(vuln_id)
+                mapping_keywords = []
+                if mapping_text:
+                    mapping_keywords = self.extract_keywords_from_mapping(mapping_text)
+                
+                # Check if this vulnerability was found
+                found_this_vuln, matching, non_matching = self.check_finding_matches(
+                    findings, mapping_keywords, vuln_name
+                )
+                
+                if found_this_vuln:
+                    found_any_vulnerability = True
+                    all_matching_findings.extend(matching)
+                all_non_matching_findings.extend(non_matching)
+            
+            # Remove duplicates from matching findings
+            all_matching_findings = list(dict.fromkeys(all_matching_findings))
+            # Remove findings that matched from non-matching list
+            all_non_matching_findings = [f for f in all_non_matching_findings if f not in all_matching_findings]
+            all_non_matching_findings = list(dict.fromkeys(all_non_matching_findings))
+            
+            found_vulnerability = found_any_vulnerability
+            matching_findings = all_matching_findings
+            non_matching_findings = all_non_matching_findings
+            vulnerability_details = vulnerability_details_list[0] if vulnerability_details_list else None
+        else:
+            # Single vulnerability - use existing logic
+            # Load vulnerability mapping and details
+            mapping_text = self.load_vulnerability_mapping(vulnerability_id)
+            vulnerability_details = self.load_vulnerability_details(vulnerability_id)
+            
+            # Extract keywords from mapping
+            mapping_keywords = []
+            if mapping_text:
+                mapping_keywords = self.extract_keywords_from_mapping(mapping_text)
+            
+            # Check if vulnerability was found
+            found_vulnerability, matching_findings, non_matching_findings = self.check_finding_matches(
+                findings, mapping_keywords, vulnerability_name
+            )
         
         # Additional check in final report text (only if no findings matched)
         # This is a fallback for when findings might be in the full report but not extracted
         if not found_vulnerability:
             report_lower = all_findings_text.lower()
-            if mapping_text and mapping_keywords:
-                # Only check for specific, multi-word keywords (more reliable)
-                specific_keywords = [kw for kw in mapping_keywords if ' ' in kw and len(kw) > 6]
-                for keyword in specific_keywords:
-                    keyword_lower = keyword.lower()
-                    # Check if keyword appears as a phrase (not just individual words)
-                    if keyword_lower in report_lower:
-                        found_vulnerability = True
-                        break
-                # For vulnerability name, require it to be mentioned meaningfully
-                # (not just as individual common words)
-                if not found_vulnerability and vulnerability_name.lower() in report_lower:
-                    # Check if it's a meaningful mention (key words are present)
-                    name_words = [w for w in vulnerability_name.lower().split() if len(w) > 4]
-                    if len(name_words) >= 2:
-                        matched_keywords = sum(1 for word in name_words if word in report_lower)
-                        if matched_keywords >= 2:
+            
+            if all_vulnerabilities:
+                # Check all vulnerabilities from URL mapping
+                for vuln_info in all_vulnerabilities:
+                    vuln_id = vuln_info.get("vulnerability_id")
+                    vuln_name = vuln_info.get("vulnerability_name", "Unknown")
+                    mapping_text = self.load_vulnerability_mapping(vuln_id)
+                    mapping_keywords = []
+                    if mapping_text:
+                        mapping_keywords = self.extract_keywords_from_mapping(mapping_text)
+                    
+                    if mapping_text and mapping_keywords:
+                        # Only check for specific, multi-word keywords (more reliable)
+                        specific_keywords = [kw for kw in mapping_keywords if ' ' in kw and len(kw) > 6]
+                        for keyword in specific_keywords:
+                            keyword_lower = keyword.lower()
+                            if keyword_lower in report_lower:
+                                found_vulnerability = True
+                                break
+                        if found_vulnerability:
+                            break
+            else:
+                # Single vulnerability case
+                mapping_text = self.load_vulnerability_mapping(vulnerability_id)
+                mapping_keywords = []
+                if mapping_text:
+                    mapping_keywords = self.extract_keywords_from_mapping(mapping_text)
+                
+                if mapping_text and mapping_keywords:
+                    # Only check for specific, multi-word keywords (more reliable)
+                    specific_keywords = [kw for kw in mapping_keywords if ' ' in kw and len(kw) > 6]
+                    for keyword in specific_keywords:
+                        keyword_lower = keyword.lower()
+                        # Check if keyword appears as a phrase (not just individual words)
+                        if keyword_lower in report_lower:
                             found_vulnerability = True
+                            break
+                    # For vulnerability name, require it to be mentioned meaningfully
+                    # (not just as individual common words)
+                    if not found_vulnerability and vulnerability_name.lower() in report_lower:
+                        # Check if it's a meaningful mention (key words are present)
+                        name_words = [w for w in vulnerability_name.lower().split() if len(w) > 4]
+                        if len(name_words) >= 2:
+                            matched_keywords = sum(1 for word in name_words if word in report_lower)
+                            if matched_keywords >= 2:
+                                found_vulnerability = True
         
         # Get vulnerability_type from vulnerability_details
         expected_vulnerability = None
@@ -594,17 +744,30 @@ class AuditorAgent:
             expected_vulnerability = vulnerability_details.get("vulnerability_type")
         
         # Build audit result
+        vulnerability_info_dict = {
+            "id": vulnerability_id,
+            "name": vulnerability_name,
+            "description": vulnerability_info.get("description"),
+            "website_id": vulnerability_info.get("website_id"),
+            "website_name": vulnerability_info.get("website_name"),
+        }
+        
+        # If we have multiple vulnerabilities, include them all
+        if all_vulnerabilities:
+            vulnerability_info_dict["all_vulnerabilities"] = [
+                {
+                    "id": v.get("vulnerability_id"),
+                    "name": v.get("vulnerability_name"),
+                    "description": self.load_vulnerability_details(v.get("vulnerability_id")).get("description", "") if self.load_vulnerability_details(v.get("vulnerability_id")) else ""
+                }
+                for v in all_vulnerabilities
+            ]
+        
         audit_result = {
             "run_id": run_id,
             "status": "success",
             "timestamp": datetime.now().isoformat(),
-            "vulnerability": {
-                "id": vulnerability_id,
-                "name": vulnerability_name,
-                "description": vulnerability_info.get("description"),
-                "website_id": vulnerability_info.get("website_id"),
-                "website_name": vulnerability_info.get("website_name"),
-            },
+            "vulnerability": vulnerability_info_dict,
             "agent_report": {
                 "website_url": report.get("website_url"),
                 "model": report.get("model"),
