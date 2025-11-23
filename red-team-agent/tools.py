@@ -1442,6 +1442,373 @@ def check_information_disclosure(url: str) -> str:
         return f"Error checking information disclosure: {str(e)}"
 
 
+@tool
+def extract_javascript_sources(url: str) -> str:
+    """
+    Extract all JavaScript code from a page (inline scripts, external scripts, executed code).
+    Useful for discovering API endpoints, API keys, authentication mechanisms, and client-side logic.
+    
+    Args:
+        url: The URL to extract JavaScript from
+    
+    Returns:
+        String containing extracted JavaScript code and findings
+    """
+    try:
+        from playwright.sync_api import sync_playwright
+        
+        findings = []
+        all_js_code = []
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url, wait_until="networkidle", timeout=15000)
+            
+            # 1. Extract inline scripts from HTML
+            inline_scripts = page.query_selector_all("script:not([src])")
+            for i, script in enumerate(inline_scripts[:10]):  # Limit to 10
+                try:
+                    content = script.inner_text() or script.get_attribute("innerHTML") or ""
+                    if content and len(content) > 50:  # Only include substantial scripts
+                        all_js_code.append(f"--- Inline Script {i+1} ---\n{content[:1000]}...")
+                except:
+                    pass
+            
+            # 2. Extract external script URLs
+            external_scripts = page.query_selector_all("script[src]")
+            script_urls = []
+            for script in external_scripts[:10]:
+                src = script.get_attribute("src")
+                if src:
+                    script_urls.append(src)
+            
+            # 3. Execute JavaScript to get global variables and window properties
+            try:
+                window_props = page.evaluate("""
+                    () => {
+                        const props = {};
+                        // Get important window properties
+                        const importantKeys = ['location', 'localStorage', 'sessionStorage'];
+                        importantKeys.forEach(key => {
+                            try {
+                                if (key === 'localStorage' || key === 'sessionStorage') {
+                                    props[key] = {};
+                                    for (let i = 0; i < window[key].length; i++) {
+                                        const k = window[key].key(i);
+                                        props[key][k] = window[key].getItem(k);
+                                    }
+                                } else {
+                                    props[key] = window[key].toString();
+                                }
+                            } catch(e) {}
+                        });
+                        return props;
+                    }
+                """)
+                if window_props:
+                    all_js_code.append(f"--- Window Properties ---\n{json.dumps(window_props, indent=2)}")
+            except:
+                pass
+            
+            # 4. Extract JavaScript from response
+            html_content = page.content()
+            script_pattern = r'<script[^>]*>(.*?)</script>'
+            matches = re.findall(script_pattern, html_content, re.DOTALL | re.IGNORECASE)
+            if matches:
+                findings.append(f"Found {len(matches)} script tags in page")
+            
+            browser.close()
+        
+        # Also check raw response
+        try:
+            response = requests.get(url, timeout=config.REQUEST_TIMEOUT)
+            html = response.text
+            # Extract inline scripts from raw HTML
+            raw_matches = re.findall(r'<script[^>]*>(.*?)</script>', html, re.DOTALL | re.IGNORECASE)
+            if raw_matches:
+                for i, match in enumerate(raw_matches[:5]):  # First 5
+                    if len(match.strip()) > 100:
+                        all_js_code.append(f"--- Raw HTML Script {i+1} ---\n{match[:1000]}...")
+        except:
+            pass
+        
+        output = []
+        if all_js_code:
+            output.append("📜 JavaScript Sources Extracted:")
+            output.extend(all_js_code[:5])  # Show first 5
+            output.append("")
+            output.append("💡 Tip: Look for API endpoints, API keys, authentication tokens, and client-side logic in the extracted code")
+        else:
+            output.append("No substantial JavaScript code found")
+        
+        if script_urls:
+            output.append(f"\n📎 External Script URLs found: {len(script_urls)}")
+            output.extend([f"  - {url}" for url in script_urls[:5]])
+        
+        return "\n".join(output)
+        
+    except ImportError:
+        return "Error: Playwright not installed. Install with: pip install playwright && playwright install"
+    except Exception as e:
+        return f"Error extracting JavaScript: {str(e)}"
+
+
+@tool
+def enumerate_resource_ids(base_url: str, url_pattern: str, id_param: str = "id", test_ids: Optional[List[int]] = None) -> str:
+    """
+    Systematically test a URL pattern with different resource IDs to find unauthorized access.
+    Useful for discovering IDOR (Insecure Direct Object Reference) vulnerabilities.
+    
+    Args:
+        base_url: Base URL of the website
+        url_pattern: URL pattern with placeholder for ID (e.g., "/api/users/{id}/profile" or "/api/users?id={id}")
+        id_param: Parameter name if using query params (default: "id")
+        test_ids: Optional list of IDs to test (default: [1, 2, 3, 100, 999, 1000])
+    
+    Returns:
+        String containing enumeration results
+    """
+    from urllib.parse import urljoin
+    
+    if test_ids is None:
+        test_ids = [1, 2, 3, 100, 999, 1000]
+    
+    accessible = []
+    results = []
+    
+    # Determine if pattern uses path or query parameter
+    is_path_param = "{" in url_pattern and "}" in url_pattern
+    is_query_param = "?" in url_pattern or not is_path_param
+    
+    try:
+        for test_id in test_ids:
+            if is_path_param:
+                # Replace placeholder in path
+                test_url = urljoin(base_url, url_pattern.format(**{id_param: test_id}))
+            else:
+                # Use query parameter
+                if "?" in url_pattern:
+                    test_url = urljoin(base_url, f"{url_pattern}&{id_param}={test_id}")
+                else:
+                    test_url = urljoin(base_url, f"{url_pattern}?{id_param}={test_id}")
+            
+            try:
+                response = requests.get(test_url, timeout=config.REQUEST_TIMEOUT, allow_redirects=False)
+                
+                if response.status_code == 200:
+                    # Check if response contains user/resource data
+                    try:
+                        data = response.json()
+                        if isinstance(data, dict):
+                            # Look for indicators of user/profile data
+                            data_indicators = ['email', 'username', 'name', 'profile', 'userId', 'user', 'id']
+                            if any(key in str(data).lower() for key in data_indicators):
+                                accessible.append(f"ID {test_id}: Status 200 - Contains resource data (potential IDOR)")
+                                # Show preview
+                                preview = str(data)[:200]
+                                accessible.append(f"  Preview: {preview}...")
+                            else:
+                                results.append(f"ID {test_id}: Status 200 (no clear resource data)")
+                        else:
+                            if len(response.text) > 500:
+                                accessible.append(f"ID {test_id}: Status 200 - Large response ({len(response.text)} bytes)")
+                            else:
+                                results.append(f"ID {test_id}: Status 200 - Response: {response.text[:100]}")
+                    except:
+                        # Not JSON
+                        if len(response.text) > 500:
+                            accessible.append(f"ID {test_id}: Status 200 - Large response ({len(response.text)} bytes)")
+                        else:
+                            results.append(f"ID {test_id}: Status 200 - Response: {response.text[:100]}")
+                elif response.status_code == 401:
+                    results.append(f"ID {test_id}: Status 401 (requires authentication)")
+                elif response.status_code == 403:
+                    results.append(f"ID {test_id}: Status 403 (forbidden)")
+                elif response.status_code == 404:
+                    results.append(f"ID {test_id}: Status 404 (not found)")
+                else:
+                    results.append(f"ID {test_id}: Status {response.status_code}")
+                    
+            except requests.exceptions.RequestException as e:
+                results.append(f"ID {test_id}: Error - {str(e)[:50]}")
+        
+        output = []
+        if accessible:
+            output.append("🚨 POTENTIAL IDOR VULNERABILITY:")
+            output.append("Some resource IDs are accessible - test manually to verify authorization checks")
+            output.extend(accessible)
+            output.append("")
+        if results:
+            output.append("Enumeration Results:")
+            output.extend(results)
+        
+        return "\n".join(output) if output else "No accessible resources found with tested IDs."
+        
+    except Exception as e:
+        return f"Error enumerating resource IDs: {str(e)}"
+
+
+@tool
+def extract_tokens_from_response(url: str, include_cookies: bool = True, include_headers: bool = True, include_body: bool = True) -> str:
+    """
+    Extract tokens (JWT, session tokens, API keys) from HTTP response.
+    Checks cookies, headers, and response body for various token formats.
+    
+    Args:
+        url: The URL to get tokens from
+        include_cookies: Extract tokens from cookies (default: True)
+        include_headers: Extract tokens from response headers (default: True)
+        include_body: Extract tokens from response body (default: True)
+    
+    Returns:
+        String containing extracted tokens and their locations
+    """
+    try:
+        response = requests.get(url, timeout=config.REQUEST_TIMEOUT, allow_redirects=True)
+        
+        tokens_found = []
+        
+        # Token patterns
+        jwt_pattern = r'(eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)'
+        session_pattern = r'(session[_-]?id|sessionid|sessid|sid)[=:]\s*([a-zA-Z0-9_-]{20,})'
+        api_key_pattern = r'(api[_-]?key|apikey)[=:]\s*["\']?([a-zA-Z0-9_-]{20,})'
+        bearer_pattern = r'Bearer\s+([a-zA-Z0-9_.-]+)'
+        
+        # 1. Check cookies
+        if include_cookies:
+            for cookie in response.cookies:
+                cookie_value = cookie.value
+                # Check for JWT
+                jwt_matches = re.findall(jwt_pattern, cookie_value)
+                if jwt_matches:
+                    tokens_found.append(f"🍪 Cookie '{cookie.name}': JWT token found (length: {len(jwt_matches[0])})")
+                elif len(cookie_value) > 20:
+                    tokens_found.append(f"🍪 Cookie '{cookie.name}': Potential token (length: {len(cookie_value)})")
+        
+        # 2. Check headers
+        if include_headers:
+            for header_name, header_value in response.headers.items():
+                # Check Authorization header
+                if header_name.lower() == 'authorization':
+                    bearer_match = re.search(bearer_pattern, header_value)
+                    if bearer_match:
+                        tokens_found.append(f"📋 Header 'Authorization': Bearer token found")
+                
+                # Check for JWT in any header
+                jwt_matches = re.findall(jwt_pattern, header_value)
+                if jwt_matches:
+                    tokens_found.append(f"📋 Header '{header_name}': JWT token found")
+        
+        # 3. Check response body
+        if include_body:
+            body = response.text
+            
+            # JWT tokens
+            jwt_matches = re.findall(jwt_pattern, body)
+            if jwt_matches:
+                unique_jwts = list(set(jwt_matches[:5]))  # Limit to 5 unique
+                tokens_found.append(f"📄 Response Body: Found {len(jwt_matches)} JWT token(s)")
+                for jwt in unique_jwts[:3]:
+                    tokens_found.append(f"  Token preview: {jwt[:50]}...")
+            
+            # Session tokens
+            session_matches = re.findall(session_pattern, body, re.IGNORECASE)
+            if session_matches:
+                tokens_found.append(f"📄 Response Body: Found {len(session_matches)} session token pattern(s)")
+            
+            # API keys
+            api_key_matches = re.findall(api_key_pattern, body, re.IGNORECASE)
+            if api_key_matches:
+                tokens_found.append(f"📄 Response Body: Found {len(api_key_matches)} API key pattern(s)")
+        
+        output = []
+        if tokens_found:
+            output.append("🔑 TOKENS EXTRACTED:")
+            output.extend(tokens_found)
+            output.append("")
+            output.append("💡 Tip: Analyze JWT tokens to check structure, extract JWKS endpoints, and test authentication mechanisms")
+        else:
+            output.append("No tokens found in response")
+        
+        return "\n".join(output)
+        
+    except requests.exceptions.RequestException as e:
+        return f"Error extracting tokens: {str(e)}"
+
+
+@tool
+def follow_discovery_endpoints(base_url: str) -> str:
+    """
+    Check common API discovery and metadata endpoints.
+    Useful for finding JWKS endpoints, API documentation, and other metadata.
+    
+    Args:
+        base_url: Base URL of the website
+    
+    Returns:
+        String containing discovered endpoints and their content
+    """
+    from urllib.parse import urljoin
+    
+    discovery_paths = [
+        "/.well-known/jwks.json",
+        "/.well-known/openid-configuration",
+        "/api/auth/jwks",
+        "/api/jwks",
+        "/jwks.json",
+        "/swagger.json",
+        "/swagger.yaml",
+        "/openapi.json",
+        "/api-docs",
+        "/docs",
+        "/robots.txt",
+        "/sitemap.xml",
+    ]
+    
+    findings = []
+    
+    for path in discovery_paths:
+        url = urljoin(base_url, path)
+        try:
+            response = requests.get(url, timeout=config.REQUEST_TIMEOUT, allow_redirects=False)
+            
+            if response.status_code == 200:
+                content_type = response.headers.get('Content-Type', '')
+                
+                if 'json' in content_type.lower():
+                    try:
+                        data = response.json()
+                        findings.append(f"✅ {path}: JSON response (keys: {list(data.keys())[:5] if isinstance(data, dict) else 'array'})")
+                        # Preview
+                        preview = str(data)[:200]
+                        findings.append(f"   Preview: {preview}...")
+                    except:
+                        findings.append(f"✅ {path}: Status 200 (non-JSON)")
+                else:
+                    findings.append(f"✅ {path}: Status 200, Content-Type: {content_type}")
+                    preview = response.text[:200]
+                    findings.append(f"   Preview: {preview}...")
+            elif response.status_code == 404:
+                pass  # Not found, don't report
+            else:
+                findings.append(f"{path}: Status {response.status_code}")
+                
+        except requests.exceptions.RequestException:
+            pass  # Skip errors
+    
+    output = []
+    if findings:
+        output.append("🔍 DISCOVERY ENDPOINTS CHECKED:")
+        output.extend(findings)
+        output.append("")
+        output.append("💡 Tip: JWKS endpoints expose public keys for JWT verification. Check if they can be used for algorithm confusion attacks.")
+    else:
+        output.append("No discovery endpoints found")
+    
+    return "\n".join(output)
+
+
 def get_tools() -> List:
     """
     Get all available tools for the agent
@@ -1464,7 +1831,11 @@ def get_tools() -> List:
         check_csrf_protection,
         fuzz_parameters,
         check_information_disclosure,
-        check_client_side_api_keys,  # New tool for Vulnerability ID 8
+        check_client_side_api_keys,  # Tool for Vulnerability ID 8
+        extract_javascript_sources,  # General-purpose: Extract JS to find endpoints, keys, logic
+        enumerate_resource_ids,  # General-purpose: Test different IDs for IDOR
+        extract_tokens_from_response,  # General-purpose: Extract JWT, session tokens, API keys
+        follow_discovery_endpoints,  # General-purpose: Check JWKS, swagger, metadata endpoints
     ]
     
     # Add custom Playwright tools if available
