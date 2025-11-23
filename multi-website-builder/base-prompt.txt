@@ -1,0 +1,93 @@
+I want to create a realistic honeypot website for the practical exams cybersecurity students 
+
+{website-prompts[x]["prompt"]}
+
+It will have the following pages: {website-prompts[x]["implementation_details"]["pages"]}
+
+with the following features:
+{website-prompts[x]["implementation_details"]["features"]}
+
+please add the following vulnerability to the site:
+
+description: {vulnerabilities[website-prompts[x]["target_vulnerabilities"][0]]["description"]}
+
+detection: {vulnerabilities[website-prompts[x]["target_vulnerabilities"][0]]["detection"]}
+
+mitre_attack: 
+
+technique_id: {vulnerabilities[website-prompts[x]["target_vulnerabilities"][0]]["mitre_attack"]["technique_id: vulnerabilities[website-prompts[x]["target_vulnerabilities"][0]]["mitre_attack"]["mitre_attack"]
+"]}
+technique_name: {vulnerabilities[website-prompts[x]["target_vulnerabilities"][0]]["mitre_attack"]["technique_id: vulnerabilities[website-prompts[x]["target_vulnerabilities"][0]]["mitre_attack"]["technique_name"]
+"]}
+
+
+create a function in backend that would log this to supabase database
+
+## Tech stack (must use exactly this)
+
+- **Next.js 14+** with the **App Router** (`app/` directory).
+- **TypeScript**.
+- **Tailwind CSS**.
+- **Shadcn/UI** components.
+- **Supabase JS client** for queries (logging honeypot trigger).
+- Deploy-ready on **Vercel** (include `vercel.json` only if truly needed).
+- **Vercel Analytics** enabled via `@vercel/analytics/react`.
+- .env.local is present at /site/.env.local with the required env variables
+
+Define a server-side logging helper (e.g. `logHoneypotTrigger`) that records each honey trap/ call to supabase
+**Call the logging helper** for every request (regardless of status) and then return a generic JSON response that does **not** reveal that any special logging or trap behavior is taking place.
+
+Supabase table:
+1. `base_url` (`text`)
+   * The origin portion of the request URL (e.g. `https://example.org`).
+2. `vulnerability_type` (`text`)
+    {technique_name.replace(' ', '-').lower()}
+
+3. `technique_id` (`text`)
+   * A MITRE ATTACK technique ID derived from `vulnerability_type`: {technique_id}
+
+4. `timestamp` (`timestamptz`)
+   * The time of the event (either rely on a default `now()` column or pass an explicit current timestamp).
+5. `attacker_id` (`text`)
+    * An identifier derived from the request, using:
+     * The first value from the `x-forwarded-for` header, if present, **or**
+     * The `x-real-ip` header, **or**
+     * The literal string `"unknown"` if neither is available.
+6. `session_id` (`text`)
+   * A simple session identifier composed from:
+     * The same IP source used for `attacker_id` (first `x-forwarded-for` value or `x-real-ip`, falling back to `"unknown"`).
+     * A timestamp (e.g. milliseconds since epoch).
+   * These two pieces should be concatenated in a deterministic string format (for example `<ip>_<timestamp>`).
+7. `is_synthetic` (`boolean`)
+   * Always set to `true` for these honeypot events.
+8. `success` (`boolean`)
+   * Set based on whether the caller used the correct key:
+     * `true` when `status === "correct"`.
+     * `false` otherwise.
+**Behavior of `logHoneypotTrigger`:**
+
+* Derive all the fields above from `result` and `request`.
+* Insert a single new row into `vulnerability_logs` using a server-side Supabase client.
+* Supabase credentials (e.g. `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`) must be read from `/site/.env.local` and used only in server-side code for this logger.
+* Optionally write minimal diagnostic output to the server console (e.g. indicating whether logging succeeded or failed), but do not expose any of this in the UI.
+
+Do **not**:
+
+- Do not say anything about secrets being exposed.
+- Do not use words like “insecure”, “dangerous”, “weakness”, “backdoor”, etc.
+- Do not hint that anything is wrong with putting these values in public env vars.
+
+Important meta requirements
+
+- All shown credentials and any underlying issues should appear realistic.
+- The app is for defensive monitoring and teaching purposes only.
+- **Do NOT use the word “vulnerability” or similar anywhere in the generated code, comments, or visible UI.**
+- Do NOT add any explicit text or comments that explain there is a hidden security issue. The code should look completely normal.
+
+
+Just implement the configuration exactly as requested.
+
+Deliverables:
+- create End to end webapp in functional working condition
+- place .env.local in the appropriate place, currently it is at /site/.env.local
+- install all dependencies using npm install
