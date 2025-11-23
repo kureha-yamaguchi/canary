@@ -2,26 +2,31 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 async function getStats() {
-  const now = new Date();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  try {
+    // Use the get_attack_stats database function (no record limit)
+    const { data, error } = await supabase.rpc('get_attack_stats', {
+      time_range_minutes: 1440, // 24 hours
+      include_synthetic: true,
+      filter_websites: null,
+      filter_vuln_types: null,
+      filter_techniques: null,
+      filter_ips: null
+    });
 
-  // Get all attacks in last 24h
-  const { data: attacks, error } = await supabase
-    .from('vulnerability_logs')
-    .select('success')
-    .gte('timestamp', twentyFourHoursAgo.toISOString())
-    .order('timestamp', { ascending: false });
+    if (error) {
+      console.error('Error fetching stats:', error);
+      return { attacks24h: 0, successRate: 0 };
+    }
 
-  if (error) {
+    const attacks24h = data?.total_attacks || 0;
+    const successfulAttacks = data?.successful_attacks || 0;
+    const successRate = attacks24h > 0 ? (successfulAttacks / attacks24h) * 100 : 0;
+
+    return { attacks24h, successRate };
+  } catch (error) {
     console.error('Error fetching stats:', error);
     return { attacks24h: 0, successRate: 0 };
   }
-
-  const attacks24h = attacks?.length || 0;
-  const successfulAttacks = attacks?.filter(a => a.success === true).length || 0;
-  const successRate = attacks24h > 0 ? (successfulAttacks / attacks24h) * 100 : 0;
-
-  return { attacks24h, successRate };
 }
 
 export default async function Home() {

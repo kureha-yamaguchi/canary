@@ -1,9 +1,29 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { AttackHistogramChart } from '../components/AttackHistogramChart';
 import { LiveAttacksFeed } from '../components/LiveAttacksFeed';
-import { AttacksDataTable } from '../components/AttacksDataTable';
+
+interface Website {
+  url: string;
+  name: string;
+  description: string;
+}
+
+interface Technique {
+  technique_id: string;
+  name: string;
+  description?: string;
+  url?: string;
+  domain?: string;
+  tactic?: string;
+}
+
+interface TacticsData {
+  tactics: Record<string, Technique[]>;
+  techniques: Technique[];
+}
 
 interface HistogramDataPoint {
   time_bucket: string;
@@ -11,44 +31,6 @@ interface HistogramDataPoint {
   tactic_name: string;
   attack_count: number;
 }
-
-interface Stats {
-  total_attacks: number;
-  successful_attacks: number;
-  unique_targets: number;
-  unique_techniques: number;
-}
-
-interface FilterOptions {
-  websites: string[];
-  vuln_types: string[];
-  techniques: string[];
-  ips: string[];
-}
-
-interface TacticChartData {
-  time: string;
-  [key: string]: number | string;
-}
-
-const TIME_RANGES = [
-  { label: 'Last 5 mins', minutes: 5 },
-  { label: 'Last 10 mins', minutes: 10 },
-  { label: 'Last 30 mins', minutes: 30 },
-  { label: 'Last 1 hr', minutes: 60 },
-  { label: 'Last 2 hrs', minutes: 120 },
-  { label: 'Last 12 hrs', minutes: 720 },
-  { label: 'Last 24 hrs', minutes: 1440 },
-  { label: 'Last week', minutes: 10080 },
-  { label: 'Last month', minutes: 43200 },
-  { label: 'Custom', minutes: -1 },
-];
-
-const TIME_UNITS = [
-  { label: 'Minutes', value: 'minutes', multiplier: 1 },
-  { label: 'Hours', value: 'hours', multiplier: 60 },
-  { label: 'Months', value: 'months', multiplier: 43200 },
-];
 
 // MITRE ATT&CK Tactics with colors
 const TACTIC_COLORS: Record<string, string> = {
@@ -68,7 +50,133 @@ const TACTIC_COLORS: Record<string, string> = {
   'Impact': '#FFB627',
 };
 
-export default function DashboardPage() {
+const websites: Website[] = [
+  {
+    url: 'https://honeypot-nine.vercel.app',
+    name: 'Honeypot API',
+    description: 'Exposed API key'
+  },
+  {
+    url: 'https://very-secure-website.vercel.app',
+    name: 'Very Secure Website',
+    description: 'Actually secure, but logs all attack attempts'
+  },
+  {
+    url: 'https://honeypot-jwt-alg-confusion.vercel.app',
+    name: 'JWT Honeypot',
+    description: 'Vulnerable to JWT injection attacks'
+  },
+  {
+    url: 'https://neuralmarket.vercel.app',
+    name: 'Neural Market',
+    description: 'User ID manipulation allows viewing other users\' credentials'
+  },
+  {
+    url: 'https://sqli-demo-shop.vercel.app',
+    name: 'Demo Shopping Portal',
+    description: 'SQL injection in product search and login forms'
+  },
+  {
+    url: 'https://xss-guestbook.vercel.app',
+    name: 'XSS Guestbook',
+    description: 'Stored XSS in comment fields, no input sanitization'
+  },
+  {
+    url: 'https://file-traversal-docs.vercel.app',
+    name: 'Document Viewer',
+    description: 'Path traversal vulnerability in file download endpoint'
+  },
+  {
+    url: 'https://csrf-bank-demo.vercel.app',
+    name: 'Banking Demo',
+    description: 'Missing CSRF tokens on money transfer forms'
+  },
+  {
+    url: 'https://xxe-parser-api.vercel.app',
+    name: 'XML Parser API',
+    description: 'XXE vulnerability in XML upload endpoint'
+  },
+  {
+    url: 'https://ssrf-image-proxy.vercel.app',
+    name: 'Image Proxy Service',
+    description: 'SSRF via unvalidated URL parameter in image fetcher'
+  },
+  {
+    url: 'https://open-redirect-ads.vercel.app',
+    name: 'Ad Network Redirector',
+    description: 'Open redirect vulnerability in click tracking'
+  },
+  {
+    url: 'https://nosql-injection-blog.vercel.app',
+    name: 'Tech Blog Platform',
+    description: 'NoSQL injection in MongoDB search queries'
+  },
+  {
+    url: 'https://insecure-upload.vercel.app',
+    name: 'File Upload Service',
+    description: 'Unrestricted file upload with code execution'
+  },
+  {
+    url: 'https://broken-auth-admin.vercel.app',
+    name: 'Admin Dashboard',
+    description: 'Broken authentication allows session fixation'
+  },
+  {
+    url: 'https://hardcoded-secrets.vercel.app',
+    name: 'Legacy API Gateway',
+    description: 'Hardcoded credentials in client-side JavaScript'
+  },
+  {
+    url: 'https://cors-misconfigured.vercel.app',
+    name: 'Data Analytics API',
+    description: 'Overly permissive CORS allows credential theft'
+  },
+  {
+    url: 'https://xml-bomb-parser.vercel.app',
+    name: 'XML Processing Service',
+    description: 'Vulnerable to XML bomb DoS attacks'
+  },
+  {
+    url: 'https://graphql-introspection.vercel.app',
+    name: 'GraphQL API',
+    description: 'Introspection enabled, exposes full schema and mutations'
+  },
+  {
+    url: 'https://race-condition-wallet.vercel.app',
+    name: 'Digital Wallet',
+    description: 'Race condition in balance updates allows double-spending'
+  }
+];
+
+interface Stats {
+  total_attacks: number;
+  successful_attacks: number;
+  unique_targets: number;
+  unique_techniques: number;
+}
+
+const TIME_RANGES = [
+  { label: 'Last 5 mins', minutes: 5 },
+  { label: 'Last 10 mins', minutes: 10 },
+  { label: 'Last 30 mins', minutes: 30 },
+  { label: 'Last 1 hr', minutes: 60 },
+  { label: 'Last 2 hrs', minutes: 120 },
+  { label: 'Last 12 hrs', minutes: 720 },
+  { label: 'Last 24 hrs', minutes: 1440 },
+  { label: 'Last week', minutes: 10080 },
+  { label: 'Last month', minutes: 43200 },
+  { label: 'Last 6 months', minutes: 259200 },
+];
+
+export default function DemoPage() {
+  const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
+  const [mode, setMode] = useState<'defensive' | 'offensive'>('defensive');
+
+  // Time filter state
+  const [timeFrom, setTimeFrom] = useState<Date>(new Date(Date.now() - 1440 * 60000)); // 24 hours ago
+  const [useCustomTimeFrom, setUseCustomTimeFrom] = useState(false);
+
+  // Stats and histogram data
   const [histogramData, setHistogramData] = useState<HistogramDataPoint[]>([]);
   const [stats, setStats] = useState<Stats>({
     total_attacks: 0,
@@ -76,587 +184,540 @@ export default function DashboardPage() {
     unique_targets: 0,
     unique_techniques: 0
   });
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
-    websites: [],
-    vuln_types: [],
-    techniques: [],
-    ips: []
-  });
-  const [loading, setLoading] = useState(true);
+  const [attacksData, setAttacksData] = useState<any[]>([]);
 
-  // Filters
-  const [timeRange, setTimeRange] = useState(1440); // 24 hours default
-  const [isCustomTimeRange, setIsCustomTimeRange] = useState(false);
-  const [customValue, setCustomValue] = useState(1);
-  const [customUnit, setCustomUnit] = useState<'minutes' | 'hours' | 'months'>('hours');
-  const [selectedWebsites, setSelectedWebsites] = useState<string[]>([]);
-  const [selectedVulnTypes, setSelectedVulnTypes] = useState<string[]>([]);
-  const [selectedTechniques, setSelectedTechniques] = useState<string[]>([]);
-  const [selectedIPs, setSelectedIPs] = useState<string[]>([]);
-  const [includeSynthetic, setIncludeSynthetic] = useState(false);
+  // Offensive mode state
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('');
+  const [tacticsData, setTacticsData] = useState<TacticsData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
 
-  // Dropdown states for filter sections
-  const [websitesOpen, setWebsitesOpen] = useState(false);
-  const [vulnTypesOpen, setVulnTypesOpen] = useState(false);
-  const [techniquesOpen, setTechniquesOpen] = useState(false);
-  const [ipsOpen, setIpsOpen] = useState(false);
-
-  // Refs for dropdown containers
-  const websitesRef = useRef<HTMLDivElement>(null);
-  const vulnTypesRef = useRef<HTMLDivElement>(null);
-  const techniquesRef = useRef<HTMLDivElement>(null);
-  const ipsRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdowns when clicking outside
+  // Fetch tactics and techniques data
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        websitesRef.current && !websitesRef.current.contains(event.target as Node) &&
-        vulnTypesRef.current && !vulnTypesRef.current.contains(event.target as Node) &&
-        techniquesRef.current && !techniquesRef.current.contains(event.target as Node) &&
-        ipsRef.current && !ipsRef.current.contains(event.target as Node)
-      ) {
-        setWebsitesOpen(false);
-        setVulnTypesOpen(false);
-        setTechniquesOpen(false);
-        setIpsOpen(false);
-      }
-    };
-
-    if (websitesOpen || vulnTypesOpen || techniquesOpen || ipsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+    if (mode === 'offensive') {
+      fetchTacticsData();
     }
-  }, [websitesOpen, vulnTypesOpen, techniquesOpen, ipsOpen]);
+  }, [mode]);
 
-  // Convert minutes to custom value and unit
-  const convertMinutesToCustom = (minutes: number): { value: number; unit: 'minutes' | 'hours' | 'months' } => {
-    // Try months first (30 days = 43200 minutes)
-    if (minutes >= 43200 && minutes % 43200 === 0) {
-      return { value: minutes / 43200, unit: 'months' };
-    }
-    // Try hours
-    if (minutes >= 60 && minutes % 60 === 0) {
-      return { value: minutes / 60, unit: 'hours' };
-    }
-    // Default to minutes
-    return { value: minutes, unit: 'minutes' };
-  };
-
-  // Calculate effective time range in minutes
-  const getEffectiveTimeRange = (): number => {
-    if (isCustomTimeRange) {
-      const unit = TIME_UNITS.find(u => u.value === customUnit);
-      return customValue * (unit?.multiplier || 1);
-    }
-    return timeRange;
-  };
-
-  // Clear all filters and refresh
-  const clearFilters = () => {
-    setSelectedWebsites([]);
-    setSelectedVulnTypes([]);
-    setSelectedTechniques([]);
-    setSelectedIPs([]);
-    // Fetch data after clearing filters
-    setTimeout(() => fetchData(), 0);
-  };
-
-  // Apply filters and refresh
-  const applyFilters = () => {
-    fetchData();
-  };
-
-  // Toggle checkbox selection
-  const toggleSelection = (value: string, selected: string[], setSelected: (values: string[]) => void) => {
-    if (selected.includes(value)) {
-      setSelected(selected.filter(v => v !== value));
-    } else {
-      setSelected([...selected, value]);
-    }
-  };
-
-  // Auto-refresh only for time range and synthetic data
+  // Fetch stats when filters change
   useEffect(() => {
-    fetchData();
-  }, [timeRange, isCustomTimeRange, customValue, customUnit, includeSynthetic]);
+    fetchStats();
+    fetchAttacksData();
+  }, [timeFrom, mode, selectedWebsite, selectedCategory, selectedSubcategory]);
 
-  const fetchData = async () => {
+  const fetchTacticsData = async () => {
     setLoading(true);
-
     try {
-      // Get effective time range
-      const effectiveTimeRange = getEffectiveTimeRange();
-
-      // Determine bucket size based on time range
-      const bucketMinutes = effectiveTimeRange <= 60 ? 5 : effectiveTimeRange <= 720 ? 30 : 60;
-
-      // Build query parameters
-      const params = new URLSearchParams({
-        timeRange: effectiveTimeRange.toString(),
-        bucketMinutes: bucketMinutes.toString(),
-        includeSynthetic: includeSynthetic.toString(),
-      });
-
-      if (selectedWebsites.length > 0) {
-        params.append('websites', selectedWebsites.join(','));
+      const response = await fetch('/api/tactics');
+      if (response.ok) {
+        const data = await response.json();
+        setTacticsData(data);
       }
-      if (selectedVulnTypes.length > 0) {
-        params.append('vulnTypes', selectedVulnTypes.join(','));
-      }
-      if (selectedTechniques.length > 0) {
-        params.append('techniques', selectedTechniques.join(','));
-      }
-      if (selectedIPs.length > 0) {
-        params.append('ips', selectedIPs.join(','));
-      }
-
-      // Call API route
-      const response = await fetch(`/api/attacks?${params.toString()}`);
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('Error fetching data:', error);
-        setLoading(false);
-        return;
-      }
-
-      const data = await response.json();
-      console.log('API Response:', data);
-
-      setHistogramData(data.histogram || []);
-      setStats(data.stats || {
-        total_attacks: 0,
-        successful_attacks: 0,
-        unique_targets: 0,
-        unique_techniques: 0
-      });
-      setFilterOptions(data.filters || {
-        websites: [],
-        vuln_types: [],
-        techniques: [],
-        ips: []
-      });
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching tactics data:', error);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
-  // Transform histogram data for recharts (pivot by tactic)
-  const getChartData = (): TacticChartData[] => {
-    if (histogramData.length === 0) return [];
+  const fetchStats = async () => {
+    setStatsLoading(true);
+    try {
+      // Calculate time range in minutes from timeFrom to NOW
+      // (Backend API fetches from NOW backwards by X minutes)
+      const now = Date.now();
+      const timeRangeMinutes = Math.floor((now - timeFrom.getTime()) / 60000);
 
-    // Group by time bucket
-    const buckets = new Map<string, TacticChartData>();
-
-    histogramData.forEach(item => {
-      const timeKey = new Date(item.time_bucket).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
+      const params = new URLSearchParams({
+        timeRange: timeRangeMinutes.toString(),
+        bucketMinutes: '60',
+        includeSynthetic: 'true',
       });
 
-      if (!buckets.has(timeKey)) {
-        buckets.set(timeKey, { time: timeKey });
+      // Add filters based on mode
+      if (mode === 'defensive' && selectedWebsite) {
+        // Include both with and without trailing slash
+        const urlWithoutSlash = selectedWebsite.url.replace(/\/$/, '');
+        const urlWithSlash = urlWithoutSlash + '/';
+        params.append('websites', `${urlWithoutSlash},${urlWithSlash}`);
+      } else if (mode === 'offensive') {
+        if (selectedSubcategory && selectedSubcategory !== 'ALL') {
+          // Specific technique selected
+          params.append('techniques', selectedSubcategory);
+        } else if (selectedCategory && selectedCategory !== 'ALL' && tacticsData) {
+          // Category selected with "All Techniques" - filter by all techniques in this category
+          const categoryTechniques = tacticsData.tactics[selectedCategory]?.map(t => t.technique_id) || [];
+          if (categoryTechniques.length > 0) {
+            params.append('techniques', categoryTechniques.join(','));
+          }
+        }
       }
 
-      const bucket = buckets.get(timeKey)!;
-      bucket[item.tactic_name] = (bucket[item.tactic_name] as number || 0) + item.attack_count;
+      const response = await fetch(`/api/attacks?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        setHistogramData(data.histogram || []);
+        setStats(data.stats || {
+          total_attacks: 0,
+          successful_attacks: 0,
+          unique_targets: 0,
+          unique_techniques: 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
+  const fetchAttacksData = async () => {
+    try {
+      const now = Date.now();
+      const timeRangeMinutes = Math.floor((now - timeFrom.getTime()) / 60000);
+
+      const params = new URLSearchParams({
+        timeRange: timeRangeMinutes.toString(),
+        includeSynthetic: 'true',
+      });
+
+      // Add filters based on mode
+      if (mode === 'defensive' && selectedWebsite) {
+        const urlWithoutSlash = selectedWebsite.url.replace(/\/$/, '');
+        const urlWithSlash = urlWithoutSlash + '/';
+        params.append('websites', `${urlWithoutSlash},${urlWithSlash}`);
+      } else if (mode === 'offensive') {
+        if (selectedSubcategory && selectedSubcategory !== 'ALL') {
+          params.append('techniques', selectedSubcategory);
+        } else if (selectedCategory && selectedCategory !== 'ALL' && tacticsData) {
+          const categoryTechniques = tacticsData.tactics[selectedCategory]?.map(t => t.technique_id) || [];
+          if (categoryTechniques.length > 0) {
+            params.append('techniques', categoryTechniques.join(','));
+          }
+        }
+      }
+
+      const response = await fetch(`/api/attacks-data?${params.toString()}`);
+      if (response.ok) {
+        const data = await response.json();
+        setAttacksData(data);
+      }
+    } catch (error) {
+      console.error('Error fetching attacks data:', error);
+    }
+  };
+
+  const downloadCSV = () => {
+    if (attacksData.length === 0) return;
+
+    // Create CSV header
+    const headers = [
+      'Timestamp',
+      'Target URL',
+      'Vulnerability Type',
+      'Technique ID',
+      'Source IP',
+      'Session ID',
+      'Success',
+      'Synthetic',
+      'Attack ID'
+    ];
+
+    // Create CSV rows
+    const rows = attacksData.map(attack => {
+      const fullUrl = attack.url_path ? `${attack.base_url}${attack.url_path}` : attack.base_url;
+      return [
+        attack.timestamp,
+        `"${fullUrl}"`,
+        attack.vulnerability_type,
+        attack.technique_id,
+        attack.attacker_id,
+        attack.session_id || '',
+        attack.success ? 'true' : 'false',
+        attack.is_synthetic ? 'true' : 'false',
+        attack.id
+      ];
     });
 
-    return Array.from(buckets.values()).reverse();
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `attack_data_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const chartData = getChartData();
-  const uniqueTactics = [...new Set(histogramData.map(d => d.tactic_name))].filter(Boolean);
-  const successRate = stats.total_attacks > 0
-    ? ((stats.successful_attacks / stats.total_attacks) * 100).toFixed(1)
-    : '0.0';
+  // Get available subcategories based on selected category
+  const availableSubcategories = selectedCategory && selectedCategory !== 'ALL' && tacticsData
+    ? tacticsData.tactics[selectedCategory] || []
+    : [];
+
+  // Handle category change
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    // Set to "ALL" by default when selecting a specific category
+    setSelectedSubcategory(category && category !== 'ALL' ? 'ALL' : '');
+  };
+
+  // Handle quick time range selection
+  const setQuickTimeRange = (minutes: number) => {
+    setTimeFrom(new Date(Date.now() - minutes * 60000));
+    setUseCustomTimeFrom(false);
+  };
+
+  // Format date for input
+  const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
 
   return (
     <div className="min-h-screen relative bg-[#F5F5F7] dark:bg-charcoal">
       {/* Header */}
       <div className="border-b border-charcoal dark:border-cream bg-white dark:bg-charcoal">
         <div className="px-6 py-4">
-          <h1 className="text-4xl font-bold tracking-tighter font-[family-name:var(--font-ibm-plex-mono)]">
-            LIVE_DASHBOARD
-          </h1>
-          <div className="text-xs text-ghost">/system/monitoring/realtime</div>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold tracking-tighter font-[family-name:var(--font-ibm-plex-mono)]">
+                ATTACK_DASHBOARD
+              </h1>
+              <div className="text-xs text-ghost">/system/dashboard</div>
+            </div>
+            <Link
+              href="/dashboard_old"
+              className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal text-charcoal dark:text-cream px-4 py-2 text-sm font-mono hover:bg-cyan hover:text-charcoal transition-colors"
+            >
+              [OLD_DASHBOARD →]
+            </Link>
+          </div>
         </div>
       </div>
 
-      <div className="px-6 py-6 space-y-6">
-        {/* Filters */}
-        <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-6">
-          <div className="space-y-4">
-            {/* Time Range Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-ghost block mb-2">TIME_RANGE</label>
-                <select
-                  value={timeRange}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    const previousTimeRange = timeRange === -1 ? getEffectiveTimeRange() : timeRange;
-
-                    if (value === -1) {
-                      // Switching to custom - set defaults based on previous selection
-                      const converted = convertMinutesToCustom(previousTimeRange);
-                      setCustomValue(converted.value);
-                      setCustomUnit(converted.unit);
-                      setIsCustomTimeRange(true);
-                    } else {
-                      setIsCustomTimeRange(false);
-                    }
-
-                    setTimeRange(value);
-                  }}
-                  className="w-full border border-charcoal dark:border-cream bg-white dark:bg-charcoal text-charcoal dark:text-cream px-3 py-2 text-sm font-mono"
-                >
-                  {TIME_RANGES.map(range => (
-                    <option key={range.minutes} value={range.minutes}>
-                      {range.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Synthetic Toggle */}
-              <div>
-                <label className="text-xs text-ghost block mb-2">SYNTHETIC_DATA</label>
-                <button
-                  onClick={() => setIncludeSynthetic(!includeSynthetic)}
-                  className={`w-full border border-charcoal dark:border-cream px-3 py-2 text-sm font-mono transition-colors ${
-                    includeSynthetic
-                      ? 'bg-cyan text-charcoal'
-                      : 'bg-white dark:bg-charcoal text-charcoal dark:text-cream'
-                  }`}
-                >
-                  [{includeSynthetic ? 'INCLUDED' : 'EXCLUDED'}]
-                </button>
-              </div>
-            </div>
-
-            {/* Custom Time Inputs */}
-            {isCustomTimeRange && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-ghost block mb-2">CUSTOM_VALUE</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={customValue}
-                    onChange={(e) => setCustomValue(Number(e.target.value))}
-                    className="w-full border border-charcoal dark:border-cream bg-white dark:bg-charcoal text-charcoal dark:text-cream px-3 py-2 text-sm font-mono"
-                    placeholder="Enter value"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-ghost block mb-2">CUSTOM_UNIT</label>
-                  <select
-                    value={customUnit}
-                    onChange={(e) => setCustomUnit(e.target.value as 'minutes' | 'hours' | 'months')}
-                    className="w-full border border-charcoal dark:border-cream bg-white dark:bg-charcoal text-charcoal dark:text-cream px-3 py-2 text-sm font-mono"
+      <div className="px-6 py-6 h-[calc(100vh-80px)]">
+        <div className="grid grid-cols-12 gap-6 h-full">
+          {/* Left Column - Filters */}
+          <div className="col-span-4 space-y-4 overflow-y-auto">
+            {/* Mode Toggle */}
+            <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-4">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-ghost font-mono">MODE:</span>
+                <div className="flex border border-charcoal dark:border-cream">
+                  <button
+                    onClick={() => setMode('defensive')}
+                    className={`px-4 py-1.5 text-xs font-mono transition-colors ${
+                      mode === 'defensive'
+                        ? 'bg-cyan text-charcoal'
+                        : 'bg-white dark:bg-charcoal text-charcoal dark:text-cream hover:bg-cyan/10'
+                    }`}
                   >
-                    {TIME_UNITS.map(unit => (
-                      <option key={unit.value} value={unit.value}>
-                        {unit.label}
-                      </option>
-                    ))}
-                  </select>
+                    [DEFENSIVE]
+                  </button>
+                  <button
+                    onClick={() => setMode('offensive')}
+                    className={`px-4 py-1.5 text-xs font-mono border-l border-charcoal dark:border-cream transition-colors ${
+                      mode === 'offensive'
+                        ? 'bg-cyan text-charcoal'
+                        : 'bg-white dark:bg-charcoal text-charcoal dark:text-cream hover:bg-cyan/10'
+                    }`}
+                  >
+                    [OFFENSIVE]
+                  </button>
                 </div>
               </div>
-            )}
-
-            {/* Filters and Clear Button Row */}
-            <div className="flex flex-wrap gap-4 items-start">
-              {/* Websites */}
-              <div ref={websitesRef} className="relative flex-1 min-w-[150px]">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setWebsitesOpen(!websitesOpen);
-                    setVulnTypesOpen(false);
-                    setTechniquesOpen(false);
-                    setIpsOpen(false);
-                  }}
-                  className="w-full border border-charcoal dark:border-cream px-4 py-2 text-left text-sm font-mono bg-white dark:bg-charcoal hover:bg-cyan hover:text-charcoal dark:hover:bg-cyan transition-colors flex justify-between items-center"
-                >
-                  <span>WEBSITES {selectedWebsites.length > 0 && `(${selectedWebsites.length})`}</span>
-                  <span>{websitesOpen ? '▼' : '▶'}</span>
-                </button>
-                {websitesOpen && (
-                  <div
-                    className="absolute z-10 w-full mt-1 border border-charcoal dark:border-cream bg-white dark:bg-charcoal max-h-60 overflow-y-auto"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="px-4 py-3">
-                      {filterOptions.websites.map(website => (
-                        <div
-                          key={website}
-                          className="flex items-center gap-2 py-1 text-sm font-mono cursor-pointer hover:text-cyan"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSelection(website, selectedWebsites, setSelectedWebsites);
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedWebsites.includes(website)}
-                            onChange={() => {}}
-                            className="cursor-pointer pointer-events-none"
-                          />
-                          <span>{website}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Vulnerability Types */}
-              <div ref={vulnTypesRef} className="relative flex-1 min-w-[150px]">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setVulnTypesOpen(!vulnTypesOpen);
-                    setWebsitesOpen(false);
-                    setTechniquesOpen(false);
-                    setIpsOpen(false);
-                  }}
-                  className="w-full border border-charcoal dark:border-cream px-4 py-2 text-left text-sm font-mono bg-white dark:bg-charcoal hover:bg-cyan hover:text-charcoal dark:hover:bg-cyan transition-colors flex justify-between items-center"
-                >
-                  <span>VULN_TYPES {selectedVulnTypes.length > 0 && `(${selectedVulnTypes.length})`}</span>
-                  <span>{vulnTypesOpen ? '▼' : '▶'}</span>
-                </button>
-                {vulnTypesOpen && (
-                  <div
-                    className="absolute z-10 w-full mt-1 border border-charcoal dark:border-cream bg-white dark:bg-charcoal max-h-60 overflow-y-auto"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="px-4 py-3">
-                      {filterOptions.vuln_types.map(type => (
-                        <div
-                          key={type}
-                          className="flex items-center gap-2 py-1 text-sm font-mono cursor-pointer hover:text-cyan"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSelection(type, selectedVulnTypes, setSelectedVulnTypes);
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedVulnTypes.includes(type)}
-                            onChange={() => {}}
-                            className="cursor-pointer pointer-events-none"
-                          />
-                          <span>{type}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Techniques */}
-              <div ref={techniquesRef} className="relative flex-1 min-w-[150px]">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTechniquesOpen(!techniquesOpen);
-                    setWebsitesOpen(false);
-                    setVulnTypesOpen(false);
-                    setIpsOpen(false);
-                  }}
-                  className="w-full border border-charcoal dark:border-cream px-4 py-2 text-left text-sm font-mono bg-white dark:bg-charcoal hover:bg-cyan hover:text-charcoal dark:hover:bg-cyan transition-colors flex justify-between items-center"
-                >
-                  <span>TECHNIQUES {selectedTechniques.length > 0 && `(${selectedTechniques.length})`}</span>
-                  <span>{techniquesOpen ? '▼' : '▶'}</span>
-                </button>
-                {techniquesOpen && (
-                  <div
-                    className="absolute z-10 w-full mt-1 border border-charcoal dark:border-cream bg-white dark:bg-charcoal max-h-60 overflow-y-auto"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="px-4 py-3">
-                      {filterOptions.techniques.map(technique => (
-                        <div
-                          key={technique}
-                          className="flex items-center gap-2 py-1 text-sm font-mono cursor-pointer hover:text-cyan"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSelection(technique, selectedTechniques, setSelectedTechniques);
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedTechniques.includes(technique)}
-                            onChange={() => {}}
-                            className="cursor-pointer pointer-events-none"
-                          />
-                          <span>{technique}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Source IPs */}
-              <div ref={ipsRef} className="relative flex-1 min-w-[150px]">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIpsOpen(!ipsOpen);
-                    setWebsitesOpen(false);
-                    setVulnTypesOpen(false);
-                    setTechniquesOpen(false);
-                  }}
-                  className="w-full border border-charcoal dark:border-cream px-4 py-2 text-left text-sm font-mono bg-white dark:bg-charcoal hover:bg-cyan hover:text-charcoal dark:hover:bg-cyan transition-colors flex justify-between items-center"
-                >
-                  <span>SOURCE_IPS {selectedIPs.length > 0 && `(${selectedIPs.length})`}</span>
-                  <span>{ipsOpen ? '▼' : '▶'}</span>
-                </button>
-                {ipsOpen && (
-                  <div
-                    className="absolute z-10 w-full mt-1 border border-charcoal dark:border-cream bg-white dark:bg-charcoal max-h-60 overflow-y-auto"
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="px-4 py-3">
-                      {filterOptions.ips.map(ip => (
-                        <div
-                          key={ip}
-                          className="flex items-center gap-2 py-1 text-sm font-mono cursor-pointer hover:text-cyan"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSelection(ip, selectedIPs, setSelectedIPs);
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedIPs.includes(ip)}
-                            onChange={() => {}}
-                            className="cursor-pointer pointer-events-none"
-                          />
-                          <span>{ip}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Apply Filters Button */}
-              <button
-                onClick={applyFilters}
-                className="border border-charcoal dark:border-cream bg-cyan text-charcoal px-4 py-2 text-sm font-mono hover:bg-amber hover:text-charcoal transition-colors whitespace-nowrap"
-              >
-                [APPLY_FILTERS]
-              </button>
-
-              {/* Clear Filters Button */}
-              <button
-                onClick={clearFilters}
-                className="border border-charcoal dark:border-cream bg-crimson text-cream px-4 py-2 text-sm font-mono hover:bg-cyan hover:text-charcoal transition-colors whitespace-nowrap"
-              >
-                [CLEAR_FILTERS]
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-4">
-            <div className="text-xs text-ghost mb-1">TOTAL_ATTACKS</div>
-            <div className="text-3xl font-bold text-cyan">{stats.total_attacks.toLocaleString()}</div>
-          </div>
-          <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-4">
-            <div className="text-xs text-ghost mb-1">SUCCESS_RATE</div>
-            <div className="text-3xl font-bold text-amber">{successRate}%</div>
-          </div>
-          <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-4">
-            <div className="text-xs text-ghost mb-1">UNIQUE_TARGETS</div>
-            <div className="text-3xl font-bold text-crimson">{stats.unique_targets}</div>
-          </div>
-          <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-4">
-            <div className="text-xs text-ghost mb-1">TECHNIQUES</div>
-            <div className="text-3xl font-bold text-neural-purple">{stats.unique_techniques}</div>
-          </div>
-        </div>
-
-        {/* Main Content Grid - Histogram and Live Attacks */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Histogram - Takes up 2 columns */}
-          <div className="lg:col-span-2 border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-bold tracking-tighter font-[family-name:var(--font-ibm-plex-mono)]">
-                ATTACK_VOLUME_BY_TACTIC
-              </h2>
-              <div className="text-xs text-ghost">Stacked histogram showing attack distribution</div>
             </div>
 
-            {loading ? (
-              <div className="h-64 flex items-center justify-center text-ghost">
-                [LOADING_DATA...]
-              </div>
-            ) : chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData} barCategoryGap={0}>
-                  <XAxis
-                    dataKey="time"
-                    stroke="#9B9B9B"
-                    style={{ fontSize: '10px', fontFamily: 'monospace' }}
-                  />
-                  <YAxis
-                    stroke="#9B9B9B"
-                    style={{ fontSize: '10px', fontFamily: 'monospace' }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #1A1A1D',
-                      fontFamily: 'monospace',
-                      fontSize: '12px'
-                    }}
-                  />
-                  {uniqueTactics.map(tactic => (
-                    <Bar
-                      key={tactic}
-                      dataKey={tactic}
-                      stackId="a"
-                      fill={TACTIC_COLORS[tactic] || '#9B9B9B'}
-                    />
+            {/* Selection UI based on mode */}
+            {mode === 'defensive' ? (
+              <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-4 flex flex-col">
+                <div className="mb-3">
+                  <h2 className="text-sm font-bold tracking-tighter font-[family-name:var(--font-ibm-plex-mono)]">
+                    TARGET_SELECTION
+                  </h2>
+                  {selectedWebsite && (
+                    <div className="text-[10px] text-cyan font-mono mt-1">
+                      {selectedWebsite.name}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 500px)' }}>
+                  {websites.map((website, index) => (
+                    <div
+                      key={index}
+                      onClick={() => setSelectedWebsite(website)}
+                      className={`border p-3 cursor-pointer transition-all ${
+                        selectedWebsite?.url === website.url
+                          ? 'border-cyan bg-cyan/10'
+                          : 'border-charcoal/20 dark:border-cream/20 hover:bg-cyan/5'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-xs font-bold font-mono mb-1 truncate">
+                            {website.name}
+                          </h3>
+                          <p className="text-[10px] text-ghost font-mono line-clamp-2">
+                            {website.description}
+                          </p>
+                        </div>
+                        <a
+                          href={website.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="border border-charcoal dark:border-cream bg-cyan text-charcoal px-2 py-1 text-[10px] font-mono hover:bg-amber transition-colors whitespace-nowrap flex-shrink-0"
+                        >
+                          [OPEN →]
+                        </a>
+                      </div>
+                    </div>
                   ))}
-                </BarChart>
-              </ResponsiveContainer>
+                </div>
+              </div>
             ) : (
-              <div className="h-64 flex items-center justify-center text-ghost">
-                [NO_DATA_AVAILABLE]
+              /* Offensive Mode - Category/Subcategory Selection */
+              <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-4">
+                <div className="mb-4">
+                  <h2 className="text-sm font-bold tracking-tighter font-[family-name:var(--font-ibm-plex-mono)]">
+                    ATTACK_CONFIGURATION
+                  </h2>
+                  <div className="text-[10px] text-ghost mt-1">
+                    Select tactic and technique
+                  </div>
+                </div>
+
+                {loading ? (
+                  <div className="text-center py-8 text-ghost text-xs">[LOADING_DATA...]</div>
+                ) : !tacticsData ? (
+                  <div className="text-center py-8 text-ghost text-xs">[NO_DATA_AVAILABLE]</div>
+                ) : (
+                  <>
+                    {/* Category Dropdown */}
+                    <div className="mb-4">
+                      <label className="block text-[10px] text-ghost font-mono mb-2">CATEGORY (TACTIC)</label>
+                      <select
+                        value={selectedCategory}
+                        onChange={(e) => handleCategoryChange(e.target.value)}
+                        className="w-full border border-charcoal dark:border-cream bg-white dark:bg-charcoal text-charcoal dark:text-cream px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-cyan"
+                      >
+                        <option value="">Select a tactic...</option>
+                        <option value="ALL">All Categories</option>
+                        {Object.keys(tacticsData.tactics).sort().map((tactic) => (
+                          <option key={tactic} value={tactic}>
+                            {tactic} ({tacticsData.tactics[tactic].length})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Subcategory Dropdown - only show if not "All Categories" */}
+                    {selectedCategory && selectedCategory !== 'ALL' && (
+                      <div className="mb-4">
+                        <label className="block text-[10px] text-ghost font-mono mb-2">SUBCATEGORY (TECHNIQUE)</label>
+                        <select
+                          value={selectedSubcategory}
+                          onChange={(e) => setSelectedSubcategory(e.target.value)}
+                          className="w-full border border-charcoal dark:border-cream bg-white dark:bg-charcoal text-charcoal dark:text-cream px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-cyan"
+                        >
+                          <option value="ALL">All Techniques</option>
+                          {availableSubcategories.map((technique) => (
+                            <option key={technique.technique_id} value={technique.technique_id}>
+                              {technique.technique_id} - {technique.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Selected Details - only show when a specific technique is selected */}
+                    {selectedSubcategory && selectedSubcategory !== 'ALL' && (
+                      <div className="border-t border-charcoal/20 dark:border-cream/20 pt-4 mt-4">
+                        {(() => {
+                          const selectedTechnique = availableSubcategories.find(t => t.technique_id === selectedSubcategory);
+                          if (!selectedTechnique) return null;
+
+                          return (
+                            <div>
+                              <div className="mb-3">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                  <span
+                                    className="px-2 py-0.5 text-[10px] font-mono"
+                                    style={{ backgroundColor: TACTIC_COLORS[selectedCategory], color: '#1A1A1D' }}
+                                  >
+                                    {selectedCategory}
+                                  </span>
+                                  <span className="text-ghost text-xs">→</span>
+                                  <span className="px-2 py-0.5 bg-charcoal dark:bg-cream text-cream dark:text-charcoal text-[10px] font-mono">
+                                    {selectedTechnique.technique_id}
+                                  </span>
+                                </div>
+                                <div className="text-xs font-mono">{selectedTechnique.name}</div>
+                              </div>
+
+                              {selectedTechnique.description && (
+                                <div>
+                                  <h4 className="text-[10px] text-ghost font-mono mb-1">DESCRIPTION</h4>
+                                  <div className="text-[10px] font-mono text-charcoal dark:text-cream leading-relaxed">
+                                    {selectedTechnique.description}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
+
+            {/* Time Range Filter */}
+            <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-4">
+              <div className="mb-3">
+                <span className="text-[10px] text-ghost font-mono">TIME_FROM (to NOW)</span>
+              </div>
+
+              {!useCustomTimeFrom ? (
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {TIME_RANGES.slice(0, 6).map((range) => (
+                      <button
+                        key={range.minutes}
+                        onClick={() => setQuickTimeRange(range.minutes)}
+                        className="px-2 py-1 text-[10px] font-mono border border-charcoal/20 dark:border-cream/20 hover:bg-cyan/10 transition-colors"
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {TIME_RANGES.slice(6).map((range) => (
+                      <button
+                        key={range.minutes}
+                        onClick={() => setQuickTimeRange(range.minutes)}
+                        className="px-2 py-1 text-[10px] font-mono border border-charcoal/20 dark:border-cream/20 hover:bg-cyan/10 transition-colors"
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setUseCustomTimeFrom(true)}
+                    className="w-full px-2 py-1 text-[10px] font-mono border border-charcoal dark:border-cream bg-white dark:bg-charcoal hover:bg-cyan/10 transition-colors"
+                  >
+                    [CUSTOM_DATE →]
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <input
+                    type="datetime-local"
+                    value={formatDateForInput(timeFrom)}
+                    onChange={(e) => setTimeFrom(new Date(e.target.value))}
+                    className="w-full border border-charcoal dark:border-cream bg-white dark:bg-charcoal text-charcoal dark:text-cream px-2 py-1 text-[10px] font-mono focus:outline-none focus:ring-1 focus:ring-cyan"
+                  />
+                  <button
+                    onClick={() => setUseCustomTimeFrom(false)}
+                    className="w-full px-2 py-1 text-[10px] font-mono border border-charcoal dark:border-cream bg-white dark:bg-charcoal hover:bg-cyan/10 transition-colors"
+                  >
+                    [← QUICK_SELECT]
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Live Attacks Feed - Takes up 1 column */}
-          <div className="lg:col-span-1">
-            <LiveAttacksFeed includeSynthetic={includeSynthetic} />
+          {/* Right Column - Observability */}
+          <div className="col-span-8 space-y-4 overflow-y-auto">
+            {/* Stats Cards and Download */}
+            <div className="flex gap-3">
+              <div className="flex-1 grid grid-cols-4 gap-3">
+                <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-3">
+                  <div className="text-[10px] text-ghost font-mono mb-1">TOTAL</div>
+                  <div className="text-xl font-bold font-mono">
+                    {statsLoading ? '...' : stats.total_attacks.toLocaleString()}
+                  </div>
+                </div>
+                <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-3">
+                  <div className="text-[10px] text-ghost font-mono mb-1">SUCCESS</div>
+                  <div className="text-xl font-bold font-mono text-crimson">
+                    {statsLoading ? '...' : stats.successful_attacks.toLocaleString()}
+                  </div>
+                </div>
+                <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-3">
+                  <div className="text-[10px] text-ghost font-mono mb-1">TARGETS</div>
+                  <div className="text-xl font-bold font-mono">
+                    {statsLoading ? '...' : stats.unique_targets}
+                  </div>
+                </div>
+                <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-3">
+                  <div className="text-[10px] text-ghost font-mono mb-1">TECHS</div>
+                  <div className="text-xl font-bold font-mono">
+                    {statsLoading ? '...' : stats.unique_techniques}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={downloadCSV}
+                disabled={attacksData.length === 0}
+                className="border border-charcoal dark:border-cream bg-cyan text-charcoal px-4 py-3 text-xs font-mono hover:bg-amber transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap h-full"
+              >
+                [DOWNLOAD_CSV]<br />
+                <span className="text-[10px]">
+                  {attacksData.length.toLocaleString()} records
+                </span>
+              </button>
+            </div>
+
+            {/* Attack Histogram */}
+            <div>
+              <AttackHistogramChart histogramData={histogramData} loading={statsLoading} />
+            </div>
+
+            {/* Live Attacks Feed */}
+            <div>
+              <LiveAttacksFeed
+                includeSynthetic={true}
+                filterWebsite={
+                  mode === 'defensive' && selectedWebsite
+                    ? (() => {
+                        const urlWithoutSlash = selectedWebsite.url.replace(/\/$/, '');
+                        const urlWithSlash = urlWithoutSlash + '/';
+                        return `${urlWithoutSlash},${urlWithSlash}`;
+                      })()
+                    : undefined
+                }
+                filterTechnique={
+                  mode === 'offensive'
+                    ? selectedSubcategory && selectedSubcategory !== 'ALL'
+                      ? selectedSubcategory
+                      : selectedCategory && selectedCategory !== 'ALL' && tacticsData
+                      ? tacticsData.tactics[selectedCategory]?.map(t => t.technique_id).join(',')
+                      : undefined
+                    : undefined
+                }
+              />
+            </div>
           </div>
         </div>
-
-        {/* Data Table for Researchers */}
-        <AttacksDataTable
-          timeRange={getEffectiveTimeRange()}
-          includeSynthetic={includeSynthetic}
-          selectedWebsites={selectedWebsites}
-          selectedVulnTypes={selectedVulnTypes}
-          selectedTechniques={selectedTechniques}
-          selectedIPs={selectedIPs}
-        />
       </div>
     </div>
   );
