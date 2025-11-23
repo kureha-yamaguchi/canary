@@ -17,8 +17,8 @@ function getSessionId(request: Request): string {
   return `${ip.split(',')[0]}_${timestamp}`;
 }
 
-const TECHNIQUE_APPLICATION_ACCESS_TOKEN = 'T1110';
-const TECHNIQUE_BRUTE_FORCE = 'T1550';
+const TECHNIQUE_APPLICATION_ACCESS_TOKEN = 'T1550';
+const TECHNIQUE_BRUTE_FORCE = 'T1110';
 
 async function logAttempt(
   request: Request,
