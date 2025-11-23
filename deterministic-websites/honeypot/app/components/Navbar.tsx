@@ -59,6 +59,12 @@ export default function Navbar({ apiKey, apiBaseUrl }: NavbarProps) {
               Prizes
             </a>
             <a
+              href="/traffic"
+              className="text-gray-300 hover:text-purple-400 transition-colors text-sm font-medium"
+            >
+              Traffic
+            </a>
+            <a
               href="https://apartresearch.com"
               target="_blank"
               rel="noopener noreferrer"

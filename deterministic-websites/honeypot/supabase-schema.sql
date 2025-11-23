@@ -17,6 +17,14 @@ CREATE TABLE vulnerability_logs (
     timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     attacker_id TEXT NOT NULL,
     session_id TEXT NOT NULL,
+    -- Fingerprint detection fields
+    entity_type TEXT DEFAULT 'unknown' CHECK (entity_type IN ('human', 'automation', 'ai_agent', 'unknown')),
+    fingerprint_confidence INTEGER DEFAULT 0 CHECK (fingerprint_confidence >= 0 AND fingerprint_confidence <= 100),
+    fingerprint_signals JSONB DEFAULT '[]'::jsonb,
+    user_agent TEXT,
+    request_headers JSONB DEFAULT '{}'::jsonb,
+    request_method TEXT,
+    request_path TEXT,
     CONSTRAINT valid_url CHECK (base_url ~ '^https?://')
 );
 
@@ -46,6 +54,8 @@ CREATE INDEX idx_vulnerability_logs_technique_id ON vulnerability_logs(technique
 CREATE INDEX idx_vulnerability_logs_timestamp ON vulnerability_logs(timestamp DESC);
 CREATE INDEX idx_vulnerability_logs_attacker_id ON vulnerability_logs(attacker_id);
 CREATE INDEX idx_vulnerability_logs_session_id ON vulnerability_logs(session_id);
+CREATE INDEX idx_vulnerability_logs_entity_type ON vulnerability_logs(entity_type);
+CREATE INDEX idx_vulnerability_logs_fingerprint_confidence ON vulnerability_logs(fingerprint_confidence DESC);
 
 -- Enable RLS on vulnerability_types
 ALTER TABLE vulnerability_types ENABLE ROW LEVEL SECURITY;

@@ -16,4 +16,17 @@ export interface VulnerabilityLog {
   timestamp?: string;
   attacker_id: string;
   session_id: string;
+  // Fingerprint detection fields
+  entity_type?: 'human' | 'automation' | 'ai_agent' | 'unknown';
+  fingerprint_confidence?: number;
+  fingerprint_signals?: Array<{
+    name: string;
+    value: string | boolean | number;
+    weight: number;
+    category: string;
+  }>;
+  user_agent?: string | null;
+  request_headers?: Record<string, string>;
+  request_method?: string;
+  request_path?: string;
 }
