@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+:root {
+  /* Threat Intelligence Color Palette */
+  --cream: #FFFEF5;
+  --charcoal: #1A1A1D;
+  --cyan: #00E5CC;
+  --amber: #FFB627;
+  --crimson: #DC143C;
+  --ghost: #9B9B9B;
+  --neural-purple: #7B68EE;
+  --alert-red: #FF3B30;
+  --light-grey: #F5F5F7;
+
+  /* Theme colors */
+  --background: var(--light-grey);
+  --foreground: var(--charcoal);
+  --accent: var(--cyan);
+  --warning: var(--amber);
+  --critical: var(--crimson);
+  --danger: var(--alert-red);
+}
+
+@theme inline {
+  --color-cream: #FFFEF5;
+  --color-charcoal: #1A1A1D;
+  --color-cyan: #00E5CC;
+  --color-amber: #FFB627;
+  --color-crimson: #DC143C;
+  --color-ghost: #9B9B9B;
+  --color-neural-purple: #7B68EE;
+  --color-alert-red: #FF3B30;
+
+  --font-heading: var(--font-ibm-plex-mono);
+  --font-body: var(--font-jetbrains-mono);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: var(--charcoal);
+    --foreground: var(--cream);
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-feature-settings: "tnum"; /* Tabular figures */
+}
+
+/* Terminal-style selection */
+::selection {
+  background: var(--cyan);
+  color: var(--charcoal);
+}
+
+/* Box drawing aesthetic for borders */
+.border-terminal {
+  border: 3px solid currentColor;
+  border-radius: 0;
+}
+
+/* Pulse animation for live status */
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Glitch effect for critical alerts */
+@keyframes glitch {
+  0% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+  }
+  60% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+  100% {
+    transform: translate(0);
+  }
+}
+
+.glitch-hover:hover {
+  animation: glitch 0.3s ease-in-out;
+}
+
+/* Noise texture background */
+@keyframes noise {
+  0%, 100% { opacity: 0.05; }
+  50% { opacity: 0.08; }
+}
+
+.noise-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px),
+    repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  animation: noise 3s infinite;
+  pointer-events: none;
+}
+
+/* Blinking cursor effect */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.cursor-blink::after {
+  content: '█';
+  animation: blink 1s infinite;
+  margin-left: 2px;
+}
+
+/* Scanning line effect for active monitoring */
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+.scan-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 229, 204, 0.1) 50%,
+    transparent 100%
+  );
+  animation: scan 3s linear infinite;
+  pointer-events: none;
+}
