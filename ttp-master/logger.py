@@ -43,7 +43,6 @@ class TTPLogger:
             "final_report": None,
             "structured_ttps": {
                 "techniques": [],
-                "sub_techniques": [],
                 "by_step": [],
                 "by_finding": []
             }
@@ -103,22 +102,13 @@ class TTPLogger:
         else:
             self.log_data["structured_ttps"]["by_finding"].append(ttp_entry)
         
-        # Track unique techniques
+        # Track unique techniques (only base TTP IDs, no sub-techniques)
         if ttp_id not in [t["ttp_id"] for t in self.log_data["structured_ttps"]["techniques"]]:
             self.log_data["structured_ttps"]["techniques"].append({
                 "ttp_id": ttp_id,
                 "ttp_name": ttp_name,
                 "mitre_url": mitre_url
             })
-        
-        # Track sub-techniques separately
-        if "." in ttp_id:
-            if ttp_id not in [t["ttp_id"] for t in self.log_data["structured_ttps"]["sub_techniques"]]:
-                self.log_data["structured_ttps"]["sub_techniques"].append({
-                    "ttp_id": ttp_id,
-                    "ttp_name": ttp_name,
-                    "mitre_url": mitre_url
-                })
     
     def set_final_report(self, report: str):
         """Set the final analysis report"""
@@ -126,8 +116,8 @@ class TTPLogger:
     
     def parse_ttp_from_report(self, report_text: str):
         """Parse TTP information from the agent's final report"""
-        # Extract TTP IDs (format: T#### or T####.###)
-        ttp_pattern = r'T\d{4}(?:\.\d{3})?'
+        # Extract TTP IDs (format: T#### only - sub-techniques will be stripped)
+        ttp_pattern = r'T\d{4}'
         
         # Extract TTP sections - match "### Step:" or "### Finding:" patterns
         # Pattern matches: ### Step: ... or ### Finding: ... followed by content until next ### or end
@@ -139,23 +129,29 @@ class TTPLogger:
         
         # Try to extract structured TTP mappings from each section
         for section_type, section_content in ttp_sections:
-            # Look for TTP ID in the section
+            # Look for TTP ID in the section (base ID only)
             ttp_id_match = re.search(ttp_pattern, section_content)
             if ttp_id_match:
-                ttp_id = ttp_id_match.group(0)
+                ttp_id = ttp_id_match.group(0)  # Already base ID only
                 
                 # Extract the step/finding description (first line)
                 lines = section_content.split('\n')
                 description = lines[0].strip() if lines else ""
                 
-                # Try to extract name and rationale
+                # Try to extract mapping_type, name, and rationale
+                mapping_type = None
                 name = ""
                 rationale = ""
                 mitre_url = ""
                 
                 for line in lines:
                     line_lower = line.lower()
-                    if '**ttp name**' in line_lower or '**name**' in line_lower:
+                    if '**mapping type**' in line_lower:
+                        # Extract mapping_type after the colon
+                        type_match = re.search(r':\s*(.+?)(?:\n|$)', line, re.IGNORECASE)
+                        if type_match:
+                            mapping_type = type_match.group(1).strip()
+                    elif '**ttp name**' in line_lower or '**name**' in line_lower:
                         # Extract name after the colon
                         name_match = re.search(r':\s*(.+?)(?:\n|$)', line, re.IGNORECASE)
                         if name_match:
@@ -173,9 +169,18 @@ class TTPLogger:
                 
                 # If we found a TTP ID, log it
                 if ttp_id:
-                    category = "step" if section_type.lower() == "step" else "finding"
+                    # Determine category and mapping_type
+                    if section_type.lower() == "step":
+                        category = "step"
+                        if not mapping_type:
+                            mapping_type = "verification step"
+                    else:
+                        category = "finding"
+                        if not mapping_type:
+                            mapping_type = "security finding"
+                    
                     if not mitre_url:
-                        mitre_url = f"https://attack.mitre.org/techniques/{ttp_id.replace('.', '/')}/"
+                        mitre_url = f"https://attack.mitre.org/techniques/{ttp_id}/"
                     
                     self.log_ttp_analysis(
                         step_or_finding=description[:200] if description else section_content[:200],
@@ -300,21 +305,13 @@ class TTPLogger:
         
         # Summary
         techniques = self.log_data["structured_ttps"]["techniques"]
-        sub_techniques = self.log_data["structured_ttps"]["sub_techniques"]
         ttp_analysis = self.log_data["ttp_analysis"]
         
         report.append("## Summary")
         report.append("")
         report.append(f"- **Total TTPs Identified:** {len(techniques)}")
-        report.append(f"- **Sub-techniques Identified:** {len(sub_techniques)}")
         report.append(f"- **Total Mappings:** {len(ttp_analysis)}")
         report.append("")
-        
-        if sub_techniques:
-            report.append("### Most Specific TTPs (Sub-techniques)")
-            for st in sub_techniques:
-                report.append(f"- **{st['ttp_id']}**: {st['ttp_name']}")
-            report.append("")
         
         report.append("---")
         report.append("")
@@ -327,9 +324,10 @@ class TTPLogger:
             for i, step in enumerate(steps, 1):
                 report.append(f"### Step {i}: {step['step_or_finding'][:100]}")
                 report.append("")
+                report.append(f"- **Mapping Type**: {step.get('mapping_type', 'verification step')}")
                 report.append(f"- **TTP ID**: {step['ttp_id']}")
                 report.append(f"- **TTP Name**: {step['ttp_name']}")
-                report.append(f"- **Mapping Rationale**: {step['rationale']}")
+                report.append(f"- **Mapping Rationale**: {step.get('mapping_rationale', step.get('rationale', ''))}")
                 report.append(f"- **MITRE URL**: {step['mitre_url']}")
                 report.append("")
         
@@ -341,9 +339,10 @@ class TTPLogger:
             for i, finding in enumerate(findings, 1):
                 report.append(f"### Finding {i}: {finding['step_or_finding'][:100]}")
                 report.append("")
+                report.append(f"- **Mapping Type**: {finding.get('mapping_type', 'security finding')}")
                 report.append(f"- **TTP ID**: {finding['ttp_id']}")
                 report.append(f"- **TTP Name**: {finding['ttp_name']}")
-                report.append(f"- **Mapping Rationale**: {finding['rationale']}")
+                report.append(f"- **Mapping Rationale**: {finding.get('mapping_rationale', finding.get('rationale', ''))}")
                 report.append(f"- **MITRE URL**: {finding['mitre_url']}")
                 report.append("")
         

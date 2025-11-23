@@ -91,17 +91,19 @@ CRITICAL: You MUST use web_search to find the exact TTP IDs from https://attack.
 
 For EACH verification step and finding above:
 
-1. **Use web_search** to find the most specific MITRE ATT&CK TTP that matches the activity
-2. **Identify the TTP ID** in format T#### or T####.### (prefer sub-techniques when available)
-3. **Provide the TTP name** and brief description
-4. **Explain why** this step/finding maps to that TTP
-5. **Include the MITRE URL** for reference
+1. **Use web_search** to find the appropriate MITRE ATT&CK TTP that matches the activity
+2. **Identify the TTP ID** in format T#### (base ID only, NO sub-techniques)
+3. **Specify mapping_type**: "verification step" for steps, "security finding" for findings
+4. **Provide the TTP name** and brief description
+5. **Explain why** this step/finding maps to that TTP (detailed mapping_rationale)
+6. **Include the MITRE URL** for reference
 
 IMPORTANT:
-- Always search for the most specific TTP possible (e.g., T1552.001 instead of T1552)
+- Use ONLY base TTP IDs (T####) - strip any sub-technique suffixes (e.g., use T1592 not T1592.002)
 - If multiple TTPs apply, list all relevant ones
 - Group related steps/findings that map to the same TTP
 - Be precise with TTP IDs - verify them using web search
+- Always specify mapping_type correctly: "verification step" or "security finding"
 
 Provide your analysis in this format:
 

@@ -9,12 +9,41 @@ from typing import Optional
 base_dir = Path(__file__).parent.parent
 red_team_dir = base_dir / "red-team-agent"
 auditor_dir = base_dir / "auditor"
+ttp_master_dir = base_dir / "ttp-master"
+
+# Import red-team-agent and auditor first (before adding ttp-master to path)
 sys.path.insert(0, str(red_team_dir))
 sys.path.insert(0, str(auditor_dir))
 
 # Import modules
 from agent import activate_agent
 from auditor import AuditorAgent
+
+# Import TTP Master (handle import error gracefully) - add to path after other imports
+TTP_MASTER_AVAILABLE = False
+analyze_ttp_report = None
+try:
+    # Import from ttp-master/agent.py using importlib to avoid path conflicts
+    import importlib.util
+    ttp_agent_path = ttp_master_dir / "agent.py"
+    if ttp_agent_path.exists():
+        spec = importlib.util.spec_from_file_location("ttp_master_agent", ttp_agent_path)
+        ttp_master_module = importlib.util.module_from_spec(spec)
+        # Temporarily add ttp-master to path for its imports
+        sys.path.insert(0, str(ttp_master_dir))
+        try:
+            spec.loader.exec_module(ttp_master_module)
+            analyze_ttp_report = ttp_master_module.analyze_report
+            TTP_MASTER_AVAILABLE = True
+        finally:
+            # Remove ttp-master from path to avoid conflicts
+            if str(ttp_master_dir) in sys.path:
+                sys.path.remove(str(ttp_master_dir))
+except Exception as e:
+    TTP_MASTER_AVAILABLE = False
+    # Silently fail - TTP Master is optional
+    # Uncomment for debugging:
+    # print(f"⚠️  TTP Master import failed: {e}")
 
 
 def extract_run_id_from_report_file(report_file_path: str) -> Optional[str]:
@@ -168,7 +197,8 @@ def run_orchestrator(
     
     try:
         auditor = AuditorAgent(red_team_logs_dir=red_team_logs_dir)
-        auditor_result = auditor.audit(run_id)
+        # Use interactive mode to prompt user for vulnerability validation
+        auditor_result = auditor.audit(run_id, interactive=True)
         
         # Check for errors
         if auditor_result.get("status") == "error":
@@ -208,17 +238,55 @@ def run_orchestrator(
         # Summary
         vulnerability_found = auditor_result.get("audit_result", {}).get("vulnerability_found", False)
         
+        # Step 3: Run TTP Master Agent
+        ttp_result = None
+        if TTP_MASTER_AVAILABLE and analyze_ttp_report:
+            print("\n" + "=" * 70)
+            print("🎯 TTP MASTER AGENT")
+            print("=" * 70)
+            
+            try:
+                # Find the report directory
+                if red_team_logs_dir:
+                    report_dir = Path(red_team_logs_dir) / f"run_{run_id}"
+                else:
+                    report_dir = base_dir / "red-team-agent" / "logs" / f"run_{run_id}"
+                
+                if report_dir.exists():
+                    ttp_result = analyze_ttp_report(
+                        report_path=str(report_dir),
+                        model=model,  # Use same model as red-team agent
+                        verbose=True
+                    )
+                    
+                    print(f"\n✅ TTP Master analysis completed")
+                    if ttp_result:
+                        ttp_count = len(ttp_result.get("structured_ttps", {}).get("techniques", []))
+                        print(f"📊 Identified {ttp_count} MITRE ATT&CK TTPs")
+                else:
+                    print(f"\n⚠️  Warning: Report directory not found: {report_dir}")
+            except Exception as e:
+                print(f"\n⚠️  TTP Master Agent failed: {e}")
+                import traceback
+                traceback.print_exc()
+        
         print("\n" + "=" * 70)
         print("📊 SUMMARY")
         print("=" * 70)
         print(f"✅ Red-team agent completed: Run ID {run_id}")
         print(f"{'✅' if vulnerability_found else '❌'} Auditor result: Vulnerability {'FOUND' if vulnerability_found else 'NOT FOUND'}")
+        if ttp_result:
+            ttp_count = len(ttp_result.get("structured_ttps", {}).get("techniques", []))
+            print(f"✅ TTP Master: Identified {ttp_count} MITRE ATT&CK TTPs")
+        elif TTP_MASTER_AVAILABLE:
+            print("⚠️  TTP Master: Analysis not completed")
         print("=" * 70 + "\n")
         
         return {
             "status": "success",
             "red_team_result": red_team_result,
             "auditor_result": auditor_result,
+            "ttp_result": ttp_result,
             "run_id": run_id,
             "vulnerability_found": vulnerability_found
         }

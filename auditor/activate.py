@@ -6,9 +6,27 @@ from pathlib import Path
 
 # Add current directory to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
+base_dir = Path(current_dir).parent
 sys.path.insert(0, current_dir)
+sys.path.insert(0, str(base_dir / "ttp-master"))
 
 from auditor import audit_report, AuditorAgent
+
+# Import TTP Master (handle import error gracefully)
+TTP_MASTER_AVAILABLE = False
+analyze_ttp_report = None
+try:
+    import importlib.util
+    ttp_master_dir = base_dir / "ttp-master"
+    ttp_agent_path = ttp_master_dir / "agent.py"
+    if ttp_agent_path.exists():
+        spec = importlib.util.spec_from_file_location("ttp_master_agent", ttp_agent_path)
+        ttp_master_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ttp_master_module)
+        analyze_ttp_report = ttp_master_module.analyze_report
+        TTP_MASTER_AVAILABLE = True
+except Exception:
+    TTP_MASTER_AVAILABLE = False
 
 
 def run(run_id: str = None, red_team_logs_dir: str = None, save_report: bool = True):
@@ -30,9 +48,9 @@ def run(run_id: str = None, red_team_logs_dir: str = None, save_report: bool = T
     print("─" * 60)
     
     try:
-        # Create auditor and audit
+        # Create auditor and audit (with interactive mode for user validation)
         auditor = AuditorAgent(red_team_logs_dir=red_team_logs_dir)
-        audit_result = auditor.audit(run_id)
+        audit_result = auditor.audit(run_id, interactive=True)
         
         # Check for errors
         if audit_result.get("status") == "error":
@@ -61,9 +79,39 @@ def run(run_id: str = None, red_team_logs_dir: str = None, save_report: bool = T
             with open(json_file, 'w', encoding='utf-8') as f:
                 json.dump(audit_result, f, indent=2, ensure_ascii=False)
             
-            print(f"\n📄 Reports saved:")
-            print(f"  - {report_file}")
-            print(f"  - {json_file}")
+        print(f"\n📄 Reports saved:")
+        print(f"  - {report_file}")
+        print(f"  - {json_file}")
+        
+        # Step 3: Run TTP Master Agent
+        if TTP_MASTER_AVAILABLE:
+            print("\n" + "─" * 60)
+            print("🎯 TTP MASTER AGENT")
+            print("─" * 60)
+            
+            try:
+                # Find the report directory
+                if red_team_logs_dir:
+                    report_dir = Path(red_team_logs_dir) / f"run_{run_id}"
+                else:
+                    report_dir = base_dir / "red-team-agent" / "logs" / f"run_{run_id}"
+                
+                if report_dir.exists():
+                    ttp_result = analyze_ttp_report(
+                        report_path=str(report_dir),
+                        model=None,  # Use default model
+                        verbose=True
+                    )
+                    
+                    if ttp_result:
+                        ttp_count = len(ttp_result.get("structured_ttps", {}).get("techniques", []))
+                        print(f"\n✅ TTP Master: Identified {ttp_count} MITRE ATT&CK TTPs")
+                else:
+                    print(f"\n⚠️  Warning: Report directory not found: {report_dir}")
+            except Exception as e:
+                print(f"\n⚠️  TTP Master Agent failed: {e}")
+                import traceback
+                traceback.print_exc()
         
         print("\n" + "─" * 60 + "\n")
         

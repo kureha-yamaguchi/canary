@@ -10,6 +10,17 @@ import re
 import sys
 from urllib.parse import urlparse
 
+# Try to import supabase client (optional)
+try:
+    from .supabase_client import insert_red_team_run, is_connected
+except ImportError:
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from supabase_client import insert_red_team_run, is_connected
+    except ImportError:
+        insert_red_team_run = None
+        is_connected = lambda: False
+
 
 def get_git_commit_hash() -> Optional[str]:
     """Get the current git commit hash (short version)"""
@@ -350,6 +361,18 @@ class AgentLogger:
         with open(report_file, 'w', encoding='utf-8') as f:
             f.write(self._generate_markdown_report())
         
+        # Save to database if connected
+        if insert_red_team_run and is_connected():
+            try:
+                website_url = self.log_data.get('website_url', '')
+                model = self.log_data.get('model', '')
+                # Assume success if we got to this point (no exceptions)
+                success = True
+                insert_red_team_run(self.run_id, model, website_url, success)
+            except Exception as e:
+                # Don't fail if database save fails
+                print(f"Warning: Failed to save run to database: {e}")
+        
         return report_file
     
     def _generate_markdown_report(self) -> str:
@@ -445,8 +468,82 @@ class AgentLogger:
         
         report.append("\n---\n")
         
-        # Verification Steps (Brief)
-        report.append("## Verification Steps")
+        # Detailed Step-by-Step Actions
+        report.append("## Detailed Steps")
+        if self.log_data["tool_calls"]:
+            step_num = 1
+            for tool_call in self.log_data["tool_calls"]:
+                tool_name = tool_call.get('tool', 'unknown')
+                args = tool_call.get('args', {})
+                result = tool_call.get('result', '')
+                timestamp = tool_call.get('timestamp', '')
+                
+                # Skip if this is just a pending placeholder with no actual data
+                if not args and (not result or result == 'pending'):
+                    continue
+                
+                # Format timestamp for display
+                try:
+                    if timestamp and timestamp != 'pending':
+                        if 'Z' in timestamp:
+                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        elif '+' in timestamp or timestamp.count('-') > 2:
+                            dt = datetime.fromisoformat(timestamp)
+                        else:
+                            dt = datetime.fromisoformat(timestamp)
+                        time_str = dt.strftime("%H:%M:%S")
+                    else:
+                        time_str = "N/A"
+                except Exception:
+                    time_str = timestamp[:8] if timestamp else "N/A"
+                
+                report.append(f"\n### Step {step_num}: {tool_name}")
+                report.append(f"**Time:** {time_str}")
+                
+                # Format arguments
+                if args and args != {}:
+                    # Filter out empty or pending args
+                    valid_args = {k: v for k, v in args.items() if v and v != 'pending' and v != {}}
+                    if valid_args:
+                        report.append(f"**Arguments:**")
+                        for key, value in valid_args.items():
+                            # Truncate long values
+                            value_str = str(value)
+                            if len(value_str) > 150:
+                                value_str = value_str[:150] + "..."
+                            report.append(f"  - `{key}`: `{value_str}`")
+                
+                # Format result
+                if result and result != 'pending':
+                    # Truncate very long results
+                    result_str = str(result)
+                    if len(result_str) > 500:
+                        # Try to keep first few lines
+                        lines = result_str.split('\n')
+                        if len(lines) > 10:
+                            result_str = '\n'.join(lines[:10]) + f"\n... ({len(lines) - 10} more lines)"
+                        else:
+                            result_str = result_str[:500] + "..."
+                    
+                    report.append(f"**Result:**")
+                    # Format result as code block if it's multi-line or contains structured data
+                    if '\n' in result_str or result_str.count(':') > 3:
+                        report.append(f"```\n{result_str}\n```")
+                    else:
+                        report.append(f"`{result_str}`")
+                elif result == 'pending':
+                    report.append(f"**Result:** ⏳ Pending execution")
+                else:
+                    report.append(f"**Result:** (No result available)")
+                
+                step_num += 1
+        else:
+            report.append("No tool calls recorded.")
+        
+        report.append("\n---\n")
+        
+        # Verification Steps (Brief Summary)
+        report.append("## Verification Steps Summary")
         # Extract only key steps (first 5)
         if self.log_data["structured_report"]["verification_steps"]:
             steps = self.log_data["structured_report"]["verification_steps"][:5]

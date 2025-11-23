@@ -361,7 +361,6 @@ class TTPMasterAgent:
         if verbose:
             print(f"📄 TTP Analysis Report: {report_file}")
             print(f"📊 Total TTPs identified: {len(self.logger.log_data['structured_ttps']['techniques'])}")
-            print(f"📊 Sub-techniques: {len(self.logger.log_data['structured_ttps']['sub_techniques'])}")
         
         return {
             "output": final_output,

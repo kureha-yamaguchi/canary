@@ -3,6 +3,7 @@
       {
         "id": 1,
         "name": "SQL Injection",
+        "vulnerability_type": "sql-injection",  
         "description": "User input concatenated directly into SQL queries without sanitization",
         "stack": [
           "database connection",
@@ -20,6 +21,7 @@
       {
         "id": 2,
         "name": "Cross-Site Scripting (XSS) - Reflected",
+        "vulnerability_type": "xss-reflected",
         "description": "User input echoed back to page without HTML encoding",
         "stack": [
           "html",
@@ -37,6 +39,7 @@
       {
         "id": 3,
         "name": "Cross-Site Scripting (XSS) - Stored",
+        "vulnerability_type": "xss-stored",
         "description": "Malicious scripts saved to database and displayed to other users",
         "stack": [
           "html",
@@ -55,6 +58,7 @@
       {
         "id": 4,
         "name": "Insecure Direct Object References (IDOR)",
+        "vulnerability_type": "idor",
         "description": "Sequential or guessable IDs expose unauthorized resources",
         "stack": [
           "url parameters",
@@ -72,6 +76,7 @@
       {
         "id": 5,
         "name": "Broken Authentication",
+        "vulnerability_type": "broken-authentication",
         "description": "Missing or weak session management",
         "stack": [
           "session management",
@@ -89,6 +94,7 @@
       {
         "id": 6,
         "name": "Missing Access Control",
+        "vulnerability_type": "missing-access-control",
         "description": "No authorization checks on sensitive endpoints",
         "stack": [
           "url routing",
@@ -106,6 +112,7 @@
       {
         "id": 7,
         "name": "Cross-Site Request Forgery (CSRF)",
+        "vulnerability_type": "csrf",
         "description": "Sensitive actions lack anti-CSRF tokens",
         "stack": [
           "html form",
@@ -123,6 +130,7 @@
       {
         "id": 8,
         "name": "Sensitive Data Exposure - Client Side",
+        "vulnerability_type": "sensitive-data-exposure-client-side",
         "description": "API keys or secrets visible in JavaScript/HTML",
         "stack": [
           "html",
@@ -140,6 +148,7 @@
       {
         "id": 9,
         "name": "XML External Entity (XXE)",
+        "vulnerability_type": "xxe",
         "description": "XML parser processes external entity references",
         "stack": [
           "xml parser",
@@ -157,6 +166,7 @@
       {
         "id": 10,
         "name": "Insecure Deserialization",
+        "vulnerability_type": "insecure-deserialization",
         "description": "Untrusted data deserialized without validation",
         "stack": [
           "cookies",
@@ -174,6 +184,7 @@
       {
         "id": 11,
         "name": "Server-Side Request Forgery (SSRF)",
+        "vulnerability_type": "ssrf",
         "description": "Application fetches user-supplied URLs without validation",
         "stack": [
           "input from user",
@@ -191,6 +202,7 @@
       {
         "id": 12,
         "name": "Path Traversal",
+        "vulnerability_type": "path-traversal",
         "description": "File paths constructed from user input allow directory navigation",
         "stack": [
           "input from user",
@@ -208,6 +220,7 @@
       {
         "id": 13,
         "name": "Local File Inclusion (LFI)",
+        "vulnerability_type": "lfi",
         "description": "Application includes files based on unvalidated user input",
         "stack": [
           "input from user",
@@ -225,6 +238,7 @@
       {
         "id": 14,
         "name": "Remote File Inclusion (RFI)",
+        "vulnerability_type": "rfi",
         "description": "Application includes files from remote URLs",
         "stack": [
           "input from user",
@@ -242,6 +256,7 @@
       {
         "id": 15,
         "name": "Command Injection",
+        "vulnerability_type": "command-injection",
         "description": "User input passed to system shell commands",
         "stack": [
           "input from user",
@@ -259,6 +274,7 @@
       {
         "id": 16,
         "name": "LDAP Injection",
+        "vulnerability_type": "ldap-injection",
         "description": "User input in LDAP queries without sanitization",
         "stack": [
           "input from user",
@@ -276,6 +292,7 @@
       {
         "id": 17,
         "name": "Row Level Security Bypass",
+        "vulnerability_type": "row-level-security-bypass",
         "description": "Multi-tenant data accessed without tenant filtering",
         "stack": [
           "database connection",
@@ -293,6 +310,7 @@
       {
         "id": 18,
         "name": "Mass Assignment",
+        "vulnerability_type": "mass-assignment",
         "description": "Bulk property updates without field whitelisting",
         "stack": [
           "html form",
@@ -311,6 +329,7 @@
       {
         "id": 19,
         "name": "Insufficient Rate Limiting",
+        "vulnerability_type": "insufficient-rate-limiting",
         "description": "No throttling on sensitive endpoints",
         "stack": [
           "backend routing",
@@ -328,6 +347,7 @@
       {
         "id": 20,
         "name": "Open Redirect",
+        "vulnerability_type": "open-redirect",
         "description": "Redirect URLs taken from unvalidated user input",
         "stack": [
           "url parameters",
@@ -345,6 +365,7 @@
       {
         "id": 21,
         "name": "Clickjacking",
+        "vulnerability_type": "clickjacking",
         "description": "Missing X-Frame-Options or CSP frame-ancestors headers",
         "stack": [
           "html",
@@ -362,6 +383,7 @@
       {
         "id": 22,
         "name": "Weak Password Policy",
+        "vulnerability_type": "weak-password-policy",
         "description": "No complexity or length requirements",
         "stack": [
           "html form",
@@ -380,6 +402,7 @@
       {
         "id": 23,
         "name": "Missing Security Headers",
+        "vulnerability_type": "missing-security-headers",
         "description": "Absent HSTS, CSP, X-Content-Type-Options headers",
         "stack": [
           "http headers",
@@ -396,6 +419,7 @@
       {
         "id": 24,
         "name": "Insecure File Upload",
+        "vulnerability_type": "insecure-file-upload",
         "description": "No validation of uploaded file types or content",
         "stack": [
           "html form",
@@ -414,6 +438,7 @@
       {
         "id": 25,
         "name": "Directory Listing Enabled",
+        "vulnerability_type": "directory-listing-enabled",
         "description": "Web server shows directory contents",
         "stack": [
           "web server configuration",
@@ -430,6 +455,7 @@
       {
         "id": 26,
         "name": "Information Disclosure in Errors",
+        "vulnerability_type": "information-disclosure-errors",
         "description": "Verbose error messages reveal stack traces or database details",
         "stack": [
           "backend error handling",
@@ -447,6 +473,7 @@
       {
         "id": 27,
         "name": "Unvalidated Redirects in Authentication",
+        "vulnerability_type": "unvalidated-redirects-auth",
         "description": "Login redirect parameter exploited for phishing",
         "stack": [
           "backend authentication",
@@ -464,6 +491,7 @@
       {
         "id": 28,
         "name": "Cookie Security Issues",
+        "vulnerability_type": "cookie-security-issues",
         "description": "Missing Secure, HttpOnly, or SameSite flags",
         "stack": [
           "cookies",
@@ -481,6 +509,7 @@
       {
         "id": 29,
         "name": "API Key in URL Parameters",
+        "vulnerability_type": "api-key-url-parameters",
         "description": "Authentication credentials passed in GET requests",
         "stack": [
           "url parameters",
@@ -498,6 +527,7 @@
       {
         "id": 30,
         "name": "NoSQL Injection",
+        "vulnerability_type": "nosql-injection",
         "description": "Unvalidated input in NoSQL queries (MongoDB, etc.)",
         "stack": [
           "input from user",
@@ -515,6 +545,7 @@
       {
         "id": 31,
         "name": "HTTPS Not Enabled",
+        "vulnerability_type": "https-not-enabled",
         "description": "Website served over HTTP instead of HTTPS",
         "stack": [
           "web server configuration",
@@ -531,6 +562,7 @@
       {
         "id": 32,
         "name": "Missing Content Security Policy (CSP)",
+        "vulnerability_type": "missing-csp",
         "description": "No Content-Security-Policy header to prevent XSS and injection attacks",
         "stack": [
           "http headers",
@@ -547,6 +579,7 @@
       {
         "id": 33,
         "name": "Certificate Expiry",
+        "vulnerability_type": "certificate-expiry",
         "description": "TLS/SSL certificate is expired or expiring soon",
         "stack": [
           "tls certificate",
@@ -563,6 +596,7 @@
       {
         "id": 34,
         "name": "Mixed Content",
+        "vulnerability_type": "mixed-content",
         "description": "HTTPS page loading HTTP resources (scripts, images, stylesheets)",
         "stack": [
           "html",
@@ -580,6 +614,7 @@
       {
         "id": 35,
         "name": "Outdated TLS Version",
+        "vulnerability_type": "outdated-tls-version",
         "description": "Server supports only TLS 1.0 or 1.1 instead of TLS 1.2+",
         "stack": [
           "tls configuration",
@@ -596,6 +631,7 @@
       {
         "id": 36,
         "name": "Deprecated TLS Support",
+        "vulnerability_type": "deprecated-tls-support",
         "description": "Server still supports deprecated SSL 2.0/3.0 or TLS 1.0",
         "stack": [
           "tls configuration",
@@ -612,6 +648,7 @@
       {
         "id": 37,
         "name": "Weak Cipher Suite",
+        "vulnerability_type": "weak-cipher-suite",
         "description": "Server supports weak or export-grade cipher suites",
         "stack": [
           "tls configuration",
@@ -628,6 +665,7 @@
       {
         "id": 38,
         "name": "Missing HSTS Header",
+        "vulnerability_type": "missing-hsts-header",
         "description": "HTTP Strict-Transport-Security header not set",
         "stack": [
           "http headers",
@@ -644,6 +682,7 @@
       {
         "id": 39,
         "name": "Missing X-Frame-Options Header",
+        "vulnerability_type": "missing-x-frame-options",
         "description": "X-Frame-Options header not set, allowing clickjacking",
         "stack": [
           "http headers",
@@ -660,6 +699,7 @@
       {
         "id": 40,
         "name": "Missing X-Content-Type-Options Header",
+        "vulnerability_type": "missing-x-content-type-options",
         "description": "X-Content-Type-Options header not set to 'nosniff'",
         "stack": [
           "http headers",
@@ -676,6 +716,7 @@
       {
         "id": 41,
         "name": "Missing Permissions-Policy Header",
+        "vulnerability_type": "missing-permissions-policy",
         "description": "Permissions-Policy (formerly Feature-Policy) header not set",
         "stack": [
           "http headers",
@@ -692,6 +733,7 @@
       {
         "id": 42,
         "name": "Insecure Set-Cookie Headers",
+        "vulnerability_type": "insecure-set-cookie-headers",
         "description": "Cookies set without Secure, HttpOnly, or SameSite attributes",
         "stack": [
           "http headers",
@@ -709,6 +751,7 @@
       {
         "id": 43,
         "name": "Missing Referrer Policy",
+        "vulnerability_type": "missing-referrer-policy",
         "description": "Referrer-Policy header not set or set to unsafe value",
         "stack": [
           "http headers",
@@ -725,6 +768,7 @@
       {
         "id": 44,
         "name": "Missing Content-Type Header",
+        "vulnerability_type": "missing-content-type-header",
         "description": "Content-Type header not set or incorrectly configured",
         "stack": [
           "http headers",
@@ -741,6 +785,7 @@
       {
         "id": 45,
         "name": "Lack of Trusted Types Readiness",
+        "vulnerability_type": "missing-trusted-types",
         "description": "Application not prepared for Trusted Types enforcement",
         "stack": [
           "javascript",
@@ -758,6 +803,7 @@
       {
         "id": 46,
         "name": "Missing Cross-Origin Resource Isolation",
+        "vulnerability_type": "missing-coep-coop",
         "description": "Cross-Origin-Embedder-Policy and Cross-Origin-Opener-Policy headers not set",
         "stack": [
           "http headers",
@@ -774,6 +820,7 @@
       {
         "id": 47,
         "name": "Server Information Disclosure",
+        "vulnerability_type": "server-information-disclosure",
         "description": "Server header reveals server type and version information",
         "stack": [
           "http headers",
@@ -790,6 +837,7 @@
       {
         "id": 48,
         "name": "Deprecated X-XSS-Protection Header",
+        "vulnerability_type": "deprecated-x-xss-protection",
         "description": "Using deprecated X-XSS-Protection header instead of CSP",
         "stack": [
           "http headers",

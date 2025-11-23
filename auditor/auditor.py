@@ -5,6 +5,16 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from urllib.parse import urlparse
 from datetime import datetime
+import sys
+import os
+
+# Try to import supabase client (optional)
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'red-team-agent'))
+    from supabase_client import insert_auditor_run, is_connected
+except ImportError:
+    insert_auditor_run = None
+    is_connected = lambda: False
 
 
 class AuditorAgent:
@@ -52,12 +62,13 @@ class AuditorAgent:
         with open(json_file, 'r', encoding='utf-8') as f:
             return json.load(f)
     
-    def detect_vulnerability_from_report(self, report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def detect_vulnerability_from_report(self, report: Dict[str, Any], interactive: bool = True) -> Optional[Dict[str, Any]]:
         """
-        Detect what vulnerability was being tested from the report
+        Detect what vulnerability was being tested from the report by examining website files
         
         Args:
             report: Red-team agent report dictionary
+            interactive: If True, prompt user for validation
         
         Returns:
             Vulnerability information dictionary, or None if not found
@@ -67,71 +78,151 @@ class AuditorAgent:
         if vulnerability:
             return vulnerability
         
-        # Otherwise, try to detect from URL
+        # Try to detect from website files (vulnerability-mapping.txt files)
         website_url = report.get("website_url")
         if not website_url:
             return None
         
-        return self._detect_vulnerability_from_url(website_url)
+        # Search for vulnerability-mapping.txt files in deterministic-websites
+        detected_vulns = self._detect_vulnerability_from_files(website_url)
+        
+        if not detected_vulns:
+            return None
+        
+        # If multiple vulnerabilities found, let user choose
+        if len(detected_vulns) > 1:
+            if interactive:
+                print("\n🔍 Multiple potential vulnerabilities detected:")
+                for i, vuln in enumerate(detected_vulns, 1):
+                    print(f"  {i}. {vuln.get('vulnerability_name', 'Unknown')} (ID: {vuln.get('vulnerability_id', 'N/A')})")
+                    print(f"     Location: {vuln.get('mapping_file', 'N/A')}")
+                
+                while True:
+                    try:
+                        choice = input(f"\nSelect vulnerability (1-{len(detected_vulns)}) or 'skip' to skip: ").strip()
+                        if choice.lower() == 'skip':
+                            return None
+                        idx = int(choice) - 1
+                        if 0 <= idx < len(detected_vulns):
+                            return detected_vulns[idx]
+                        print("Invalid choice. Please try again.")
+                    except (ValueError, KeyboardInterrupt):
+                        print("\nSkipping vulnerability detection.")
+                        return None
+            else:
+                # Non-interactive: return first match
+                return detected_vulns[0]
+        
+        # Single vulnerability found - ask user to confirm
+        vuln = detected_vulns[0]
+        if interactive:
+            print(f"\n🔍 Detected potential vulnerability from website files:")
+            print(f"   Vulnerability: {vuln.get('vulnerability_name', 'Unknown')}")
+            print(f"   ID: {vuln.get('vulnerability_id', 'N/A')}")
+            print(f"   Description: {vuln.get('description', 'N/A')}")
+            print(f"   Source: {vuln.get('mapping_file', 'N/A')}")
+            
+            while True:
+                confirm = input("\n✅ Confirm this vulnerability? (yes/no/skip): ").strip().lower()
+                if confirm in ['yes', 'y']:
+                    return vuln
+                elif confirm in ['no', 'n', 'skip']:
+                    return None
+                else:
+                    print("Please enter 'yes', 'no', or 'skip'")
+        else:
+            # Non-interactive: return the detected vulnerability
+            return vuln
     
-    def _detect_vulnerability_from_url(self, website_url: str) -> Optional[Dict[str, Any]]:
-        """Detect vulnerability from URL by checking registry"""
+    def _detect_vulnerability_from_files(self, website_url: str) -> List[Dict[str, Any]]:
+        """
+        Detect vulnerability by searching for vulnerability-mapping.txt files in website directories
+        
+        Args:
+            website_url: The website URL to match against
+        
+        Returns:
+            List of detected vulnerability dictionaries
+        """
+        detected = []
+        
+        try:
+            # Search all directories in deterministic-websites for vulnerability-mapping.txt
+            if not self.websites_dir.exists():
+                return detected
+            
+            # Get all subdirectories
+            for website_dir in self.websites_dir.iterdir():
+                if not website_dir.is_dir():
+                    continue
+                
+                # Look for vulnerability-mapping.txt in docs/ subdirectory
+                mapping_file = website_dir / "docs" / "vulnerability-mapping.txt"
+                
+                if not mapping_file.exists():
+                    # Also check root of website directory
+                    mapping_file = website_dir / "vulnerability-mapping.txt"
+                    if not mapping_file.exists():
+                        continue
+                
+                # Read and parse the mapping file
+                try:
+                    with open(mapping_file, 'r', encoding='utf-8') as f:
+                        mapping_content = f.read()
+                    
+                    # Extract vulnerability ID and name from mapping file
+                    vuln_id_match = re.search(r'Vulnerability ID:\s*(\d+)', mapping_content, re.IGNORECASE)
+                    vuln_name_match = re.search(r'Name:\s*["\']?([^"\'\n]+)', mapping_content, re.IGNORECASE)
+                    description_match = re.search(r'Description:\s*([^\n]+)', mapping_content, re.IGNORECASE)
+                    
+                    if vuln_id_match:
+                        vulnerability_id = int(vuln_id_match.group(1))
+                        vulnerability_name = vuln_name_match.group(1).strip().strip('"\'') if vuln_name_match else "Unknown"
+                        description = description_match.group(1).strip() if description_match else ""
+                        
+                        # Try to get additional info from registry
+                        website_info = self._get_website_info_from_registry(website_dir.name)
+                        
+                        detected.append({
+                            "vulnerability_id": vulnerability_id,
+                            "vulnerability_name": vulnerability_name,
+                            "description": description or website_info.get("description", ""),
+                            "website_id": website_info.get("id", website_dir.name),
+                            "website_name": website_info.get("name", website_dir.name),
+                            "port": website_info.get("port"),
+                            "mitre_techniques": website_info.get("mitre_techniques", []),
+                            "mapping_file": str(mapping_file)
+                        })
+                except Exception as e:
+                    # Skip files that can't be read or parsed
+                    continue
+            
+            return detected
+        except Exception:
+            return detected
+    
+    def _get_website_info_from_registry(self, folder_name: str) -> Dict[str, Any]:
+        """Get website information from registry.json by folder name"""
         try:
             if not self.registry_json.exists():
-                return None
+                return {}
             
             with open(self.registry_json, 'r', encoding='utf-8') as f:
                 registry = json.load(f)
             
-            parsed = urlparse(website_url)
-            url_port = parsed.port
-            url_host = parsed.hostname or ""
-            url_path = parsed.path or ""
-            
-            # Try to match by port first
-            if url_port:
-                for website in registry.get("websites", []):
-                    if website.get("port") == url_port:
-                        return {
-                            "vulnerability_id": website.get("vulnerability_id"),
-                            "vulnerability_name": website.get("vulnerability_name"),
-                            "description": website.get("description"),
-                            "website_id": website.get("id"),
-                            "website_name": website.get("name"),
-                            "port": website.get("port"),
-                            "mitre_techniques": website.get("mitre_techniques", [])
-                        }
-            
-            # Try to match by path or folder_name
             for website in registry.get("websites", []):
-                website_path = website.get("path", "")
-                folder_name = website.get("folder_name", "")
-                
-                if website_path and (website_path in url_path or website_path in url_host):
+                if website.get("id") == folder_name or website.get("folder_name") == folder_name:
                     return {
-                        "vulnerability_id": website.get("vulnerability_id"),
-                        "vulnerability_name": website.get("vulnerability_name"),
+                        "id": website.get("id"),
+                        "name": website.get("name"),
                         "description": website.get("description"),
-                        "website_id": website.get("id"),
-                        "website_name": website.get("name"),
                         "port": website.get("port"),
                         "mitre_techniques": website.get("mitre_techniques", [])
                     }
-                
-                if folder_name and (folder_name in url_path or folder_name in url_host):
-                    return {
-                        "vulnerability_id": website.get("vulnerability_id"),
-                        "vulnerability_name": website.get("vulnerability_name"),
-                        "description": website.get("description"),
-                        "website_id": website.get("id"),
-                        "website_name": website.get("name"),
-                        "port": website.get("port"),
-                        "mitre_techniques": website.get("mitre_techniques", [])
-                    }
-            
-            return None
         except Exception:
-            return None
+            pass
+        
+        return {}
     
     def load_vulnerability_mapping(self, vulnerability_id: int) -> Optional[str]:
         """
@@ -342,12 +433,13 @@ class AuditorAgent:
         
         return found_vulnerability, matching_findings, non_matching_findings
     
-    def audit(self, run_id: str) -> Dict[str, Any]:
+    def audit(self, run_id: str, interactive: bool = True) -> Dict[str, Any]:
         """
         Audit a red-team agent report and compare to actual vulnerability
         
         Args:
             run_id: The run ID to audit
+            interactive: If True, prompt user to validate detected vulnerability
         
         Returns:
             Dictionary containing audit results
@@ -355,8 +447,8 @@ class AuditorAgent:
         # Load red-team report
         report = self.load_red_team_report(run_id)
         
-        # Detect vulnerability from report
-        vulnerability_info = self.detect_vulnerability_from_report(report)
+        # Detect vulnerability from report (by examining website files)
+        vulnerability_info = self.detect_vulnerability_from_report(report, interactive=interactive)
         
         if not vulnerability_info:
             return {
@@ -415,6 +507,11 @@ class AuditorAgent:
                         if matched_keywords >= 2:
                             found_vulnerability = True
         
+        # Get vulnerability_type from vulnerability_details
+        expected_vulnerability = None
+        if vulnerability_details:
+            expected_vulnerability = vulnerability_details.get("vulnerability_type")
+        
         # Build audit result
         audit_result = {
             "run_id": run_id,
@@ -442,6 +539,15 @@ class AuditorAgent:
             },
             "vulnerability_details": vulnerability_details
         }
+        
+        # Save to database if connected and we have vulnerability_type
+        if insert_auditor_run and is_connected() and expected_vulnerability:
+            try:
+                auditor_judgement = "success" if found_vulnerability else "failure"
+                insert_auditor_run(run_id, expected_vulnerability, auditor_judgement)
+            except Exception as e:
+                # Don't fail if database save fails
+                print(f"Warning: Failed to save auditor run to database: {e}")
         
         return audit_result
     
@@ -535,17 +641,18 @@ class AuditorAgent:
         return "\n".join(lines)
 
 
-def audit_report(run_id: str, red_team_logs_dir: Optional[str] = None) -> Dict[str, Any]:
+def audit_report(run_id: str, red_team_logs_dir: Optional[str] = None, interactive: bool = True) -> Dict[str, Any]:
     """
     Simple function to audit a red-team agent report
     
     Args:
         run_id: The run ID to audit
         red_team_logs_dir: Optional directory containing red-team logs
+        interactive: If True, prompt user to validate detected vulnerability
     
     Returns:
         Audit result dictionary
     """
     auditor = AuditorAgent(red_team_logs_dir=red_team_logs_dir)
-    return auditor.audit(run_id)
+    return auditor.audit(run_id, interactive=interactive)
 
