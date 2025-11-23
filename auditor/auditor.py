@@ -184,13 +184,24 @@ class AuditorAgent:
                 
                 # Check if pattern matches (supports partial hostname matching)
                 if url_pattern in url_host or url_pattern in website_url:
+                    # Get vulnerability types from mapping
+                    vulnerability_types = mapping.get("vulnerability_types", [])
+                    
                     # Load details for each vulnerability ID
-                    for vuln_id in vulnerability_ids:
+                    for idx, vuln_id in enumerate(vulnerability_ids):
                         vuln_details = self.load_vulnerability_details(vuln_id)
                         if vuln_details:
+                            # Use vulnerability_type from mapping if available, otherwise from details
+                            vuln_type = None
+                            if idx < len(vulnerability_types):
+                                vuln_type = vulnerability_types[idx]
+                            else:
+                                vuln_type = vuln_details.get("vulnerability_type")
+                            
                             detected.append({
                                 "vulnerability_id": vuln_id,
                                 "vulnerability_name": vuln_details.get("name", "Unknown"),
+                                "vulnerability_type": vuln_type,
                                 "description": vuln_details.get("description", ""),
                                 "website_id": None,
                                 "website_name": url_host,
@@ -738,9 +749,13 @@ class AuditorAgent:
                             if matched_keywords >= 2:
                                 found_vulnerability = True
         
-        # Get vulnerability_type from vulnerability_details
+        # Get vulnerability_type from vulnerability_info (URL mapping) or vulnerability_details
         expected_vulnerability = None
-        if vulnerability_details:
+        # First try to get from vulnerability_info (from URL mapping)
+        if vulnerability_info.get("vulnerability_type"):
+            expected_vulnerability = vulnerability_info.get("vulnerability_type")
+        # Fall back to vulnerability_details
+        elif vulnerability_details:
             expected_vulnerability = vulnerability_details.get("vulnerability_type")
         
         # Build audit result
