@@ -402,7 +402,7 @@ class AuditorAgent:
         Returns:
             Content of the vulnerability mapping file, or None if not found
         """
-        # Find the vulnerability folder (e.g., vulnerability-8-api-key)
+        # First, try the standard pattern (e.g., vulnerability-8-api-key)
         mapping_pattern = f"vulnerability-{vulnerability_id}-*"
         
         for folder in self.websites_dir.glob(mapping_pattern):
@@ -410,6 +410,33 @@ class AuditorAgent:
             if mapping_file.exists():
                 with open(mapping_file, 'r', encoding='utf-8') as f:
                     return f.read()
+        
+        # If not found, search all folders for mapping files and check if they match the vulnerability ID
+        if not self.websites_dir.exists():
+            return None
+        
+        for folder in self.websites_dir.iterdir():
+            if not folder.is_dir():
+                continue
+            
+            # Check docs/vulnerability-mapping.txt
+            mapping_file = folder / "docs" / "vulnerability-mapping.txt"
+            if not mapping_file.exists():
+                # Also check root of website directory
+                mapping_file = folder / "vulnerability-mapping.txt"
+                if not mapping_file.exists():
+                    continue
+            
+            try:
+                with open(mapping_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    # Check if this mapping file is for the correct vulnerability ID
+                    vuln_id_match = re.search(r'Vulnerability ID:\s*(\d+)', content, re.IGNORECASE)
+                    if vuln_id_match and int(vuln_id_match.group(1)) == vulnerability_id:
+                        return content
+            except Exception:
+                # Skip files that can't be read
+                continue
         
         return None
     
