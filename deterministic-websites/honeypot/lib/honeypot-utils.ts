@@ -1,5 +1,6 @@
 import { HONEYPOT_CONFIG } from './honeypot-config';
 import { supabase } from './supabase';
+import { analyzeFingerprint, type FingerprintResult } from './fingerprint';
 
 export type ApiKeyCheckResult =
   | { status: 'correct'; apiKey: string; header: string }
@@ -72,7 +73,7 @@ function getSessionId(request: Request): string {
 }
 
 /**
- * Log honeypot trigger to Supabase database
+ * Log honeypot trigger to Supabase database with fingerprint detection
  */
 export async function logHoneypotTrigger(
   result: ApiKeyCheckResult,
@@ -80,6 +81,9 @@ export async function logHoneypotTrigger(
   route?: string
 ) {
   const url = new URL(request.url);
+
+  // Perform fingerprint analysis
+  const fingerprint = analyzeFingerprint(request);
 
   // Map the result status to specific vulnerability types
   const vulnerabilityType =
@@ -107,9 +111,21 @@ export async function logHoneypotTrigger(
     technique_id: techniqueId,
     attacker_id: attackerId,
     session_id: sessionId,
+    // Fingerprint detection fields
+    entity_type: fingerprint.entityType,
+    fingerprint_confidence: fingerprint.confidence,
+    fingerprint_signals: fingerprint.signals,
+    user_agent: fingerprint.userAgent,
+    request_headers: fingerprint.rawHeaders,
+    request_method: request.method,
+    request_path: route || url.pathname,
   };
 
-  console.log('[Honeypot] Attempting to log to Supabase:', payload);
+  console.log('[Honeypot] Attempting to log to Supabase:', {
+    ...payload,
+    request_headers: '[REDACTED]', // Don't log full headers
+  });
+  console.log('[Honeypot] Fingerprint:', fingerprint.entityType, `(${fingerprint.confidence}% confidence)`);
   console.log('[Honeypot] Supabase URL configured:', !!process.env.SUPABASE_URL);
   console.log('[Honeypot] Supabase key configured:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -128,3 +144,8 @@ export async function logHoneypotTrigger(
     console.error('[Honeypot] Exception while logging:', err);
   }
 }
+
+/**
+ * Export fingerprint analysis for use in other modules
+ */
+export { analyzeFingerprint, type FingerprintResult } from './fingerprint';
