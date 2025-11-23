@@ -1,8 +1,59 @@
 # Canary
 
-An autonomous security testing platform that combines LLM-powered red-team agents, vulnerable website generation, automated auditing, and real-time attack monitoring.
+To defend against agents of prey, our solution is to deploy canaries and red herrings at scale.
 
-## Overview
+Cybersecurity has a massive data problem. There is a lack of threat intelligence sharing and cybersecurity datasets, leaving cybersecurity experts in the dark and leaving organisations vulnerable in the new wave of agentic hackers. By deliberately planting vulnerabilities at scale in our client websites, our impact is 3 pronged: 
+
+1. Red herrings : lure adversaries towards our traps, away from critical assets.
+2. Threat intelligence at scale: by deploying our internal red team agents at scale, we are able to uncover information on the adversary attack vector and can map TTPS onto the industry standard MITRE ATT&CK matrix.
+3. Behavioural fingerprinting: By analysing behavioural patterns of our benign agent vs our malicious agent, we hope to forecast malicious/benign intent from breadcrumbs left by agents in the wild.
+
+In the landscape where offensive AI capabilities can spread in seconds, scalable solutions are key! This is why our pipeline has been designed to scale through our (i) automated website generator and. (ii) automated red-team agent. 
+
+
+
+## Meet the team!
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center">
+        <img src="headshot.png" width="120px;" alt="Shay Yahal"/><br />
+        <sub><b>Shay Yahal</b></sub><br />
+      </td>
+      <td align="center">
+        <img src="headshot.png" width="120px;" alt="Chris Chochran"/><br />
+        <sub><b>Chris Chochran</b></sub><br />
+      </td>
+      <td align="center">
+        <img src="headshot.png" width="120px;" alt="Syed Hussain"/><br />
+        <sub><b>Syed Hussain</b></sub><br />
+      </td>
+      <td align="center">
+        <img src="headshot.png" width="120px;" alt="Oliver Normand"/><br />
+        <sub><b>Oliver Normand</b></sub><br />
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <img src="headshot.png" width="120px;" alt="Jacob Davies"/><br />
+        <sub><b>Jacob Davies</b></sub><br />
+      </td>
+      <td align="center">
+        <img src="headshot.png" width="120px;" alt="Zak Walters"/><br />
+        <sub><b>Name</b></sub><br />
+        <sub>Affiliation</sub>
+      </td>
+      <td align="center">
+        <img src="headshot.png" width="120px;" alt="Kureha Yamaguchi"/><br />
+        <sub><b>Kureha Yamaguchi</b></sub><br />
+      </td>
+      <td></td>
+    </tr>
+  </table>
+</div>
+
+## Project Overview
 
 Canary enables systematic security assessment through a complete testing pipeline:
 
@@ -12,11 +63,28 @@ Vulnerable Websites → Red-Team Agent → Auditor → Dashboard Visualization
 
 The platform deploys autonomous agents to discover vulnerabilities, verifies findings against known exploits, and provides real-time monitoring with MITRE ATT&CK integration.
 
-## Architecture
+## About our code base
+```
+Vulnerable Websites → Red-Team Agent  → Dashboard Visualization
+```
 
-### Core Components
+### Vulnerable Websites
 
-#### Red-Team Agent (`red-team-agent/`)
+#### Deterministic Websites (`deterministic-websites/`)
+Pre-built Next.js applications with known vulnerabilities for consistent testing.
+
+- **Port**: 8000
+- **Vulnerabilities**: SQL injection, XSS (reflected/stored), API key exposure, IDOR, CSRF
+- **Structure**: Each vulnerability is a standalone Next.js app with mapping documentation
+
+#### Multi-Website Builder (`multi-website-builder/`)
+LLM-driven generator for rapid creation of vulnerable test environments.
+
+- **Tech**: Node.js + Python
+- **Features**: Configurable vulnerability types, Supabase logging
+- **Outputs**: Generated Next.js applications
+
+### Red-Team Agent (`red-team-agent/`)
 LangChain-based autonomous testing agent powered by multiple LLM providers via OpenRouter.
 
 - **Models**: GPT-4o, Claude 3.5/4.5 Sonnet, Qwen, Llama 3.3, Gemini
@@ -37,22 +105,6 @@ Executes red-team agent and auditor sequentially as a complete test pipeline.
 
 - **Features**: Automatic run coordination, exit codes, summary reporting
 - **Usage**: `python orchestrator/activate.py --model <model> --website <url>`
-
-### Target Websites
-
-#### Deterministic Websites (`deterministic-websites/`)
-Pre-built Next.js applications with known vulnerabilities for consistent testing.
-
-- **Port**: 8000
-- **Vulnerabilities**: SQL injection, XSS (reflected/stored), API key exposure, IDOR, CSRF
-- **Structure**: Each vulnerability is a standalone Next.js app with mapping documentation
-
-#### Multi-Website Builder (`multi-website-builder/`)
-LLM-driven generator for rapid creation of vulnerable test environments.
-
-- **Tech**: Node.js + Python
-- **Features**: Configurable vulnerability types, Supabase logging
-- **Outputs**: Generated Next.js applications
 
 ### Monitoring & Analytics
 
@@ -82,14 +134,6 @@ MITRE ATT&CK framework integration with threat level assessment.
 
 - **Tech**: Next.js with Supabase
 - **Features**: Real-time 24h stats, success rate tracking
-
-### Data & Configuration
-
-#### Data (`data/`)
-- `vulnarabilities.json` - 26+ vulnerability definitions with MITRE mappings
-- `url-vulnerability-mapping.json` - URL-to-vulnerability registry
-- `runs-plan.json` - Batch testing configuration (models + URLs)
-- `website-prompts.json` - LLM prompts for website generation
 
 ## Quick Start
 
@@ -198,6 +242,6 @@ The platform is modular and extensible. Key extension points:
 - **Websites**: Create new deterministic sites in [deterministic-websites/](deterministic-websites/)
 - **Analytics**: Extend dashboard backend in [dashboard/backend/](dashboard/backend/)
 
-## License
+## Acknowledgements
 
-See project license file for details.
+Our project is the output of the def/acc hackathon organised by BlueDot Impact and Apart Research, and sponsored by Halcyon Futures. We're grateful to their support in facilitating this collaboration.
