@@ -1,12 +1,12 @@
 # Canary
 
-To defend against agents of prey, our solution is to deploy canaries and red herrings at scale.
+To defend against agents of prey, our solution is to deploy red herrings (adversary traps) and canaries (early warning signals) at scale, while collecting threat intelligence.
 
 Cybersecurity has a massive data problem. There is a lack of threat intelligence sharing and cybersecurity datasets, leaving cybersecurity experts in the dark and leaving organisations vulnerable in the new wave of agentic hackers. By deliberately planting vulnerabilities at scale in our client websites, our impact is 3 pronged: 
 
-1. Red herrings : lure adversaries towards our traps, away from critical assets.
+1. Red herrings: lure adversaries towards our traps, away from critical assets.
 2. Threat intelligence at scale: by deploying our internal red team agents at scale, we are able to uncover information on the adversary attack vector and can map TTPS onto the industry standard MITRE ATT&CK matrix.
-3. Behavioural fingerprinting: By analysing behavioural patterns of our benign agent vs our malicious agent, we hope to forecast malicious/benign intent from breadcrumbs left by agents in the wild.
+3. Behavioural fingerprinting: By analysing behavioural patterns of our benign agent vs our malicious agent, we hope to forecast malicious/benign intent from breadcrumbs left by agents in the wild, providing early warning signals/ canaries. 
 
 In the landscape where offensive AI capabilities can spread in seconds, scalable solutions are key! This is why our pipeline has been designed to scale through our (i) automated website generator and. (ii) automated red-team agent. 
 
