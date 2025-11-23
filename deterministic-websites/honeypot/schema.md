@@ -40,12 +40,12 @@ Catalog of vulnerability types with metadata.
 ```sql
 -- Insert a new vulnerability log
 INSERT INTO vulnerability_logs (base_url, path, vulnerability_type, attack_id)
-VALUES ('https://example.com', '/admin', 'SQL_INJECTION', '192.168.1.1');
+VALUES ('https://example.com', '/admin', 'sql_injection', '192.168.1.1');
 
--- The vulnerability_type 'SQL_INJECTION' is automatically created if it doesn't exist
+-- The vulnerability_type 'sql_injection' is automatically created if it doesn't exist
 
 -- Later, update the difficulty
 UPDATE vulnerability_types 
 SET difficulty = 7 
-WHERE vulnerability_type = 'SQL_INJECTION';
+WHERE vulnerability_type = 'sql_injection';
 ```

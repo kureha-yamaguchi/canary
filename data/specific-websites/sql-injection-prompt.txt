@@ -1,0 +1,449 @@
+# SQL Injection Honeypot Website (Vulnerability ID 1)
+
+## BUSINESS/WEBSITE STYLE
+[SPECIFY YOUR BUSINESS/WEBSITE STYLE HERE]
+Example: "Create a user management dashboard website. Modern, clean design with a professional look. Color scheme: Blues and grays. Include a search form for finding users by username."
+
+---
+
+## VULNERABILITY OVERVIEW
+
+**Vulnerability ID:** 1
+**Vulnerability Name:** SQL Injection
+**MITRE ATT&CK Technique:** T1190 (Exploit Public-Facing Application)
+
+**Vulnerability Description:**
+This honeypot exposes a SQL injection vulnerability where user input is directly concatenated into SQL queries without sanitization or parameterization. Attackers can inject malicious SQL code to:
+- Bypass authentication
+- Extract all user data
+- Modify or delete database records
+- Execute arbitrary SQL commands
+
+---
+
+## TECHNICAL SETUP
+
+### 1. Project Initialization
+
+```bash
+# Create Next.js project
+npx create-next-app@16.0.3 users-managment --typescript --tailwind --app
+
+# Install dependencies
+npm install @supabase/supabase-js@^2.84.0
+```
+
+### 2. Project Structure
+
+```
+users-managment/
+├── app/
+│   ├── api/
+│   │   └── search/
+│   │       └── route.ts          # Vulnerable search endpoint
+│   ├── components/
+│   │   └── SearchForm.tsx       # User search form
+│   ├── layout.tsx
+│   ├── page.tsx                  # Main page with search
+│   └── globals.css
+├── lib/
+│   ├── honeypot-config.ts       # Table name configuration
+│   ├── honeypot-utils.ts         # SQL injection detection & logging
+│   └── supabase.ts               # Supabase client setup
+└── supabase-schema.sql           # Database schema
+```
+
+### 3. Environment Variables
+
+Create `.env.local`:
+
+```env
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+### 4. Package.json Scripts
+
+```json
+{
+  "scripts": {
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "start": "next start -p 3001"
+  }
+}
+```
+
+---
+
+## SUPABASE SETUP
+
+### 1. Create Mock Users Table
+
+```sql
+-- Create mock users table for SQL injection testing
+CREATE TABLE mock_1_users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL,
+    active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insert sample users
+INSERT INTO mock_1_users (username, email, active) VALUES
+    ('admin', 'admin@example.com', true),
+    ('user1', 'user1@example.com', true),
+    ('user2', 'user2@example.com', true),
+    ('test', 'test@example.com', false);
+```
+
+### 2. Database Schema for Logging
+
+Use the same `vulnerability_logs` table as other honeypots (see honeypot-api-key-prompt.txt).
+
+### 3. Supabase Client (`lib/supabase.ts`)
+
+```typescript
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+export const supabase: SupabaseClient | null = 
+  supabaseUrl && supabaseServiceKey
+    ? createClient(supabaseUrl, supabaseServiceKey)
+    : null;
+
+export interface VulnerabilityLog {
+  id?: string;
+  base_url: string;
+  vulnerability_type: string;
+  technique_id: string;
+  timestamp?: string;
+  attacker_id: string;
+  session_id: string;
+}
+```
+
+---
+
+## IMPLEMENTATION DETAILS
+
+### 1. Honeypot Configuration (`lib/honeypot-config.ts`)
+
+```typescript
+export const HONEYPOT_CONFIG = {
+  tableName: 'mock_1_users',
+} as const;
+```
+
+### 2. SQL Injection Detection (`lib/honeypot-utils.ts`)
+
+```typescript
+export type SqlInjectionCheckResult =
+  | { status: 'injection_detected'; payload: string; query: string }
+  | { status: 'suspicious'; payload: string; reason: string }
+  | { status: 'normal'; payload: string };
+
+export function checkSqlInjection(input: string): SqlInjectionCheckResult {
+  const payload = input.trim();
+  
+  // SQL injection patterns to detect
+  const sqlInjectionPatterns = [
+    /(['"`])\s*(OR|AND)\s*\1\s*=\s*\1/i,           // ' OR '1'='1
+    /(['"`])\s*(OR|AND)\s*\1\s*=\s*\1\s*--/i,      // ' OR '1'='1'--
+    /(['"`])\s*;\s*DROP\s+TABLE/i,                 // '; DROP TABLE
+    /UNION\s+SELECT/i,                              // UNION SELECT
+    /OR\s+1\s*=\s*1/i,                              // OR 1=1
+    /OR\s+1\s*=\s*1\s*--/i,                         // OR 1=1--
+    /'\s*OR\s*'1'\s*=\s*'1/i,                       // ' OR '1'='1
+    /\/\*.*\*\//,                                   // SQL comments /* */
+    /--\s/,                                         // SQL comments --
+    /;\s*(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)/i,
+  ];
+
+  for (const pattern of sqlInjectionPatterns) {
+    if (pattern.test(payload)) {
+      const vulnerableQuery = `SELECT * FROM ${HONEYPOT_CONFIG.tableName} WHERE username = '${payload}' AND active = 1`;
+      return {
+        status: 'injection_detected',
+        payload,
+        query: vulnerableQuery,
+      };
+    }
+  }
+
+  // Check for suspicious patterns
+  const suspiciousPatterns = [/['"`]/, /[;|&]/, /(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)/i];
+  let suspiciousCount = 0;
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(payload)) suspiciousCount++;
+  }
+
+  if (suspiciousCount >= 2) {
+    return { status: 'suspicious', payload, reason: 'Multiple suspicious patterns' };
+  }
+
+  return { status: 'normal', payload };
+}
+```
+
+### 3. Logging Function (`lib/honeypot-utils.ts`)
+
+```typescript
+export async function logSqlInjectionAttempt(
+  result: SqlInjectionCheckResult,
+  request: Request,
+  route?: string
+) {
+  const url = new URL(request.url);
+  
+  const vulnerabilityType =
+    result.status === 'injection_detected'
+      ? 'sql-injection-attempt'
+      : result.status === 'suspicious'
+      ? 'sql-injection-suspicious'
+      : 'sql-injection-normal';
+
+  const attackerId =
+    request.headers.get('x-forwarded-for')?.split(',')[0] ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+
+  const sessionId = `${attackerId}_${Date.now()}`;
+  const techniqueId = 'T1190'; // Exploit Public-Facing Application
+
+  const payload: any = {
+    base_url: url.origin,
+    vulnerability_type: vulnerabilityType,
+    technique_id: techniqueId,
+    attacker_id: attackerId,
+    session_id: sessionId,
+  };
+
+  if (result.status === 'injection_detected') {
+    payload.sql_payload = result.payload;
+    payload.vulnerable_query = result.query;
+  }
+
+  if (!supabase) {
+    console.warn('[Honeypot] Supabase not configured');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('vulnerability_logs')
+      .insert(payload);
+
+    if (error) {
+      console.error('[Honeypot] Failed to log:', error);
+    }
+  } catch (err) {
+    console.error('[Honeypot] Exception:', err);
+  }
+}
+```
+
+### 4. Vulnerable API Endpoint (`app/api/search/route.ts`)
+
+```typescript
+import { NextResponse } from 'next/server';
+import { checkSqlInjection, logSqlInjectionAttempt } from '@/lib/honeypot-utils';
+import { supabase } from '@/lib/supabase';
+import { HONEYPOT_CONFIG } from '@/lib/honeypot-config';
+
+/**
+ * VULNERABLE API ENDPOINT - SQL Injection Honeypot
+ * 
+ * This endpoint is intentionally vulnerable to SQL injection.
+ * User input is directly concatenated into a SQL query without sanitization.
+ * 
+ * DO NOT USE THIS PATTERN IN PRODUCTION CODE!
+ */
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const username = body.username || '';
+
+    // Check for SQL injection attempts
+    const injectionCheck = checkSqlInjection(username);
+
+    // Log the attempt to Supabase
+    await logSqlInjectionAttempt(injectionCheck, request, '/api/search');
+
+    // VULNERABLE CODE: Direct string concatenation into SQL query
+    // This is the vulnerability - user input is not sanitized or parameterized
+    const vulnerableQuery = `SELECT * FROM ${HONEYPOT_CONFIG.tableName} WHERE username = '${username}' AND active = 1`;
+
+    // Actually query the database using Supabase (safely with parameterized queries)
+    // This demonstrates what the vulnerable query would look like, but executes safely
+    let dbResults: any[] = [];
+    
+    if (supabase) {
+      try {
+        // Use Supabase's safe query method (parameterized) to actually get data
+        const { data, error } = await supabase
+          .from(HONEYPOT_CONFIG.tableName)
+          .select('username, email, active')
+          .eq('username', username)
+          .eq('active', true);
+
+        if (!error && data) {
+          dbResults = data;
+        }
+
+        // If SQL injection is detected, also return all active users to show impact
+        if (injectionCheck.status === 'injection_detected') {
+          const { data: allUsers } = await supabase
+            .from(HONEYPOT_CONFIG.tableName)
+            .select('username, email, active')
+            .eq('active', true)
+            .limit(10);
+
+          if (allUsers) {
+            dbResults = allUsers;
+          }
+        }
+      } catch (dbError) {
+        console.error('[Honeypot] Database query error:', dbError);
+      }
+    }
+
+    // Format response
+    const response: any = {
+      success: true,
+      query: vulnerableQuery,  // Show the vulnerable query in response
+      results: dbResults.map((user: any) => ({
+        username: user.username,
+        email: user.email,
+      })),
+    };
+
+    if (injectionCheck.status === 'injection_detected') {
+      response.warning = 'SQL injection attempt detected and logged';
+      if (dbResults.length > 0) {
+        response.note = `SQL injection successful - returned ${dbResults.length} records`;
+      }
+    }
+
+    return NextResponse.json(response);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'An error occurred while searching' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 5. Frontend Search Form (`app/components/SearchForm.tsx`)
+
+```typescript
+'use client';
+
+import { useState } from 'react';
+
+export default function SearchForm() {
+  const [username, setUsername] = useState('');
+  const [results, setResults] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+
+      const data = await response.json();
+      setResults(data);
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSearch} className="space-y-4">
+      <input
+        type="text"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        placeholder="Search by username..."
+        className="px-4 py-2 border rounded"
+      />
+      <button type="submit" disabled={loading}>
+        {loading ? 'Searching...' : 'Search'}
+      </button>
+      
+      {results && (
+        <div>
+          <pre>{JSON.stringify(results, null, 2)}</pre>
+        </div>
+      )}
+    </form>
+  );
+}
+```
+
+---
+
+## TESTING
+
+### 1. Test Normal Search
+- Input: `admin`
+- Expected: Returns admin user only
+
+### 2. Test SQL Injection Payloads
+Try these payloads in the search form:
+
+- `' OR '1'='1` - Returns all users
+- `' OR '1'='1'--` - Bypasses authentication with comment
+- `admin' OR 1=1--` - Boolean-based injection
+- `' UNION SELECT * FROM users--` - UNION-based injection
+- `'; DROP TABLE users--` - Destructive injection (should be logged)
+
+### 3. Verify Logging
+```sql
+SELECT * FROM vulnerability_logs 
+WHERE vulnerability_type LIKE 'sql-injection%'
+ORDER BY timestamp DESC;
+```
+
+---
+
+## SECURITY NOTES
+
+⚠️ **This code is intentionally vulnerable for honeypot purposes.**
+- DO NOT use string concatenation for SQL queries in production
+- Always use parameterized queries or ORM methods
+- Validate and sanitize all user input
+- Use prepared statements
+- Implement input validation and output encoding
+
+**Secure Alternative:**
+```typescript
+// ✅ SECURE: Use parameterized queries
+const { data } = await supabase
+  .from('users')
+  .select('*')
+  .eq('username', username)  // Parameterized, safe
+  .eq('active', true);
+```
+
+---
+
+## DEPLOYMENT
+
+1. Set environment variables in your hosting platform
+2. Run database migrations in Supabase (create `mock_1_users` table)
+3. Deploy Next.js app
+4. Monitor `vulnerability_logs` table for SQL injection attempts
+

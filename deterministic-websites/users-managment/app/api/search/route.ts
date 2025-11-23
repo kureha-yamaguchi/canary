@@ -18,8 +18,15 @@ export async function POST(request: Request) {
 
     // Check for SQL injection attempts
     const injectionCheck = checkSqlInjection(username);
+    
+    // Debug logging
+    console.log('[Honeypot] SQL Injection check result:', {
+      status: injectionCheck.status,
+      payload: injectionCheck.payload,
+      detected: injectionCheck.status === 'injection_detected',
+    });
 
-    // Log the attempt to Supabase
+    // Log the attempt to Supabase (only logs when injection_detected)
     await logSqlInjectionAttempt(injectionCheck, request, '/api/search');
 
     // VULNERABLE CODE: Direct string concatenation into SQL query

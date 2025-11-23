@@ -1,0 +1,589 @@
+# IDOR (Insecure Direct Object Reference) Honeypot Website
+
+## BUSINESS/WEBSITE STYLE
+[SPECIFY YOUR BUSINESS/WEBSITE STYLE HERE]
+Example: "Create a neural network marketplace platform. Modern, AI-focused design with a tech startup aesthetic. Color scheme: Purple and blue gradients. Include user profiles, dashboard, and API key management features."
+
+---
+
+## VULNERABILITY OVERVIEW
+
+**Vulnerability Name:** Insecure Direct Object Reference (IDOR)
+**MITRE ATT&CK Technique:** T1087 (Account Discovery)
+
+**Vulnerability Description:**
+This honeypot exposes an IDOR vulnerability where users can access other users' profile data by simply changing the user ID in the URL. The application does not properly verify that the requesting user has authorization to access the requested resource. Attackers can:
+- Enumerate user accounts by iterating through user IDs
+- Access sensitive user data (email, API keys, credits, etc.)
+- View admin accounts and their information
+- Access any user profile without authentication
+
+---
+
+## TECHNICAL SETUP
+
+### 1. Project Initialization
+
+```bash
+# Create Next.js project
+npx create-next-app@16.0.3 neuralmarket --typescript --tailwind --app
+
+# Install dependencies
+npm install @supabase/supabase-js@^2.84.0 jsonwebtoken@^9.0.2
+npm install --save-dev @types/jsonwebtoken@^9.0.10
+```
+
+### 2. Project Structure
+
+```
+neuralmarket/
+├── app/
+│   ├── api/
+│   │   ├── auth/
+│   │   │   ├── login/
+│   │   │   │   └── route.ts      # Login endpoint
+│   │   │   └── signup/
+│   │   │       └── route.ts       # Signup endpoint
+│   │   └── users/
+│   │       └── [userId]/
+│   │           └── profile/
+│   │               └── route.ts  # Vulnerable profile endpoint
+│   ├── dashboard/
+│   │   └── page.tsx               # User dashboard
+│   ├── login/
+│   │   └── page.tsx               # Login page
+│   ├── profile/
+│   │   └── [userId]/
+│   │       └── page.tsx           # Profile page
+│   ├── layout.tsx
+│   ├── page.tsx                   # Landing page
+│   └── globals.css
+├── lib/
+│   ├── auth.ts                    # JWT authentication utilities
+│   ├── honeypot-config.ts         # Mock user data
+│   ├── honeypot-utils.ts           # IDOR detection & logging
+│   └── supabase.ts                 # Supabase client setup
+└── supabase-schema.sql            # Database schema
+```
+
+### 3. Environment Variables
+
+Create `.env.local`:
+
+```env
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+JWT_SECRET=neuralmarket-weak-secret-key-123
+```
+
+---
+
+## SUPABASE SETUP
+
+### 1. Database Schema
+
+Use the same `vulnerability_logs` table as other honeypots (see honeypot-api-key-prompt.txt).
+
+### 2. Supabase Client (`lib/supabase.ts`)
+
+```typescript
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+export const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
+
+export interface VulnerabilityLog {
+  id?: string;
+  base_url: string;
+  vulnerability_type: string;
+  technique_id: string;
+  timestamp?: string;
+  attacker_id: string;
+  session_id: string;
+  success?: boolean;
+  url_path?: string;
+  is_synthetic?: boolean;
+}
+
+export async function logIdorAttempt(payload: VulnerabilityLog) {
+  if (!supabase) {
+    console.warn('[Honeypot] Supabase not configured');
+    return;
+  }
+
+  try {
+    const { error } = await supabase
+      .from('vulnerability_logs')
+      .insert(payload);
+
+    if (error) {
+      console.error('[Honeypot] Failed to log:', error);
+    }
+  } catch (err) {
+    console.error('[Honeypot] Error logging:', err);
+  }
+}
+```
+
+---
+
+## IMPLEMENTATION DETAILS
+
+### 1. Mock User Data (`lib/honeypot-config.ts`)
+
+```typescript
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  apiKey: string;
+  credits: number;
+  role: 'admin' | 'user';
+  stripeCustomerId?: string;
+  createdAt: string;
+}
+
+export const MOCK_USERS: User[] = [
+  {
+    id: '1',
+    email: 'admin@neuralmarket.ai',
+    username: 'admin',
+    firstName: 'Admin',
+    lastName: 'User',
+    apiKey: 'nm_sk_live_abc123def456ghi789',
+    credits: 10000,
+    role: 'admin',
+    stripeCustomerId: 'cus_ADMIN123xyz789',
+    createdAt: '2024-01-10T10:00:00Z',
+  },
+  {
+    id: '2',
+    email: 'user1@example.com',
+    username: 'user1',
+    firstName: 'John',
+    lastName: 'Doe',
+    apiKey: 'nm_sk_live_def456ghi789jkl012',
+    credits: 500,
+    role: 'user',
+    createdAt: '2024-01-12T14:30:00Z',
+  },
+  // ... more mock users
+];
+
+export const JWT_CONFIG = {
+  secret: 'neuralmarket-weak-secret-key-123',
+  expiresIn: '24h' as const,
+};
+```
+
+### 2. Authentication Utilities (`lib/auth.ts`)
+
+```typescript
+import jwt from 'jsonwebtoken';
+import { JWT_CONFIG } from './honeypot-config';
+
+export interface TokenPayload {
+  userId: string;
+  email: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  apiKey: string;
+  credits: number;
+  role: string;
+  stripeCustomerId?: string;
+  createdAt: string;
+}
+
+export function generateToken(payload: TokenPayload): string {
+  return jwt.sign(payload, JWT_CONFIG.secret, {
+    expiresIn: JWT_CONFIG.expiresIn,
+  });
+}
+
+export function verifyToken(token: string): TokenPayload | null {
+  try {
+    return jwt.verify(token, JWT_CONFIG.secret) as TokenPayload;
+  } catch {
+    return null;
+  }
+}
+
+export function extractToken(authHeader: string | null): string | null {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  return authHeader.substring(7);
+}
+```
+
+### 3. IDOR Detection (`lib/honeypot-utils.ts`)
+
+```typescript
+import { logIdorAttempt, VulnerabilityLog } from './supabase';
+
+export type IdorCheckResult =
+  | { status: 'own_profile'; userId: string }
+  | { status: 'unauthorized_access'; requestingUserId: string; targetUserId: string; isAdmin: boolean }
+  | { status: 'unauthenticated' };
+
+export function checkIdorAccess(
+  requestingUserId: string | null,
+  targetUserId: string,
+  targetUserRole?: string
+): IdorCheckResult {
+  if (!requestingUserId) {
+    return { status: 'unauthenticated' };
+  }
+
+  if (requestingUserId === targetUserId) {
+    return { status: 'own_profile', userId: targetUserId };
+  }
+
+  return {
+    status: 'unauthorized_access',
+    requestingUserId,
+    targetUserId,
+    isAdmin: targetUserRole === 'admin',
+  };
+}
+
+export async function logIdorProfileAccess(
+  result: IdorCheckResult,
+  request: Request,
+  targetUserId: string
+) {
+  const url = new URL(request.url);
+
+  const attackerId =
+    request.headers.get('x-forwarded-for')?.split(',')[0] ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+
+  const sessionId = `${attackerId}_${Date.now()}`;
+  const baseUrl = url.origin;
+
+  const vulnerabilityType =
+    result.status === 'unauthorized_access'
+      ? result.isAdmin
+        ? 'idor-admin-profile-access'
+        : 'idor-unauthorized-profile-access'
+      : 'idor-unauthenticated-access';
+
+  const techniqueId = 'T1087'; // Account Discovery
+  const success = result.status === 'unauthorized_access';
+
+  const payload: VulnerabilityLog = {
+    base_url: baseUrl,
+    vulnerability_type: vulnerabilityType,
+    technique_id: techniqueId,
+    attacker_id: attackerId,
+    session_id: sessionId,
+    success,
+    url_path: url.pathname,
+  };
+
+  await logIdorAttempt(payload);
+}
+```
+
+### 4. Vulnerable Profile Endpoint (`app/api/users/[userId]/profile/route.ts`)
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+import { MOCK_USERS } from '@/lib/honeypot-config';
+import { extractToken, verifyToken } from '@/lib/auth';
+import { checkIdorAccess, logIdorProfileAccess } from '@/lib/honeypot-utils';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  const { userId } = await params;
+
+  // Extract and verify JWT token
+  const authHeader = request.headers.get('authorization');
+  const token = extractToken(authHeader);
+
+  let requestingUserId: string | null = null;
+  let loggedInUserData = null;
+
+  if (token) {
+    const payload = verifyToken(token);
+    if (payload) {
+      requestingUserId = payload.userId;
+      loggedInUserData = payload as any;
+    }
+  }
+
+  // Determine which user data to return
+  let targetUser;
+  let isOwnProfile = requestingUserId === userId;
+
+  if (isOwnProfile && loggedInUserData) {
+    // Viewing own profile - return their actual signup data
+    targetUser = {
+      id: userId,
+      email: loggedInUserData.email,
+      username: loggedInUserData.username || loggedInUserData.email.split('@')[0],
+      firstName: loggedInUserData.firstName,
+      lastName: loggedInUserData.lastName,
+      apiKey: loggedInUserData.apiKey,
+      credits: loggedInUserData.credits,
+      role: loggedInUserData.role,
+      stripeCustomerId: loggedInUserData.stripeCustomerId,
+      createdAt: loggedInUserData.createdAt || new Date().toISOString(),
+    };
+  } else {
+    // Viewing someone else's profile - return random mock user
+    // VULNERABILITY: No authorization check!
+    const randomIndex = parseInt(userId) % MOCK_USERS.length;
+    const mockUser = MOCK_USERS[randomIndex];
+    targetUser = {
+      id: userId, // Return the requested ID
+      email: mockUser.email,
+      username: mockUser.username,
+      firstName: mockUser.firstName,
+      lastName: mockUser.lastName,
+      apiKey: mockUser.apiKey,
+      credits: mockUser.credits,
+      role: mockUser.role,
+      stripeCustomerId: mockUser.stripeCustomerId,
+      createdAt: mockUser.createdAt,
+    };
+  }
+
+  // Check IDOR access - only log if NOT viewing their own profile
+  const accessCheck = checkIdorAccess(
+    requestingUserId,
+    userId,
+    targetUser.role
+  );
+
+  // Only log to Supabase if this is unauthorized access
+  if (accessCheck.status === 'unauthorized_access') {
+    await logIdorProfileAccess(accessCheck, request, userId);
+  }
+
+  // VULNERABILITY: No authorization check!
+  // We return user data regardless of who's asking
+
+  // Return user profile (including sensitive data)
+  return NextResponse.json(targetUser);
+}
+```
+
+### 5. Signup Endpoint (`app/api/auth/signup/route.ts`)
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+import { generateToken } from '@/lib/auth';
+import { logAuthAttempt } from '@/lib/honeypot-utils';
+
+export async function POST(request: NextRequest) {
+  try {
+    const { email, password, firstName, lastName, username } = await request.json();
+
+    // Generate API key
+    const apiKey = `nm_sk_live_${Math.random().toString(36).substring(2, 15)}`;
+
+    // Create user payload
+    const userPayload = {
+      userId: Date.now().toString(), // Simple ID generation
+      email,
+      username: username || email.split('@')[0],
+      firstName,
+      lastName,
+      apiKey,
+      credits: 100, // Starting credits
+      role: 'user',
+      createdAt: new Date().toISOString(),
+    };
+
+    // Generate JWT token
+    const token = generateToken(userPayload);
+
+    // Log successful signup
+    await logAuthAttempt(request, 'signup', true, email);
+
+    return NextResponse.json({
+      success: true,
+      token,
+      user: userPayload,
+    });
+  } catch (error) {
+    await logAuthAttempt(request, 'signup', false);
+    return NextResponse.json(
+      { error: 'Signup failed' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 6. Login Endpoint (`app/api/auth/login/route.ts`)
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server';
+import { generateToken } from '@/lib/auth';
+import { findUserByEmail } from '@/lib/honeypot-config';
+import { logAuthAttempt } from '@/lib/honeypot-utils';
+
+export async function POST(request: NextRequest) {
+  try {
+    const { email, password } = await request.json();
+
+    // Find user (in real app, verify password hash)
+    const user = findUserByEmail(email);
+    
+    if (!user || user.password !== password) {
+      await logAuthAttempt(request, 'login', false, email);
+      return NextResponse.json(
+        { error: 'Invalid credentials' },
+        { status: 401 }
+      );
+    }
+
+    // Generate token with user data
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      apiKey: user.apiKey,
+      credits: user.credits,
+      role: user.role,
+      stripeCustomerId: user.stripeCustomerId,
+      createdAt: user.createdAt,
+    });
+
+    await logAuthAttempt(request, 'login', true, email);
+
+    return NextResponse.json({
+      success: true,
+      token,
+    });
+  } catch (error) {
+    await logAuthAttempt(request, 'login', false);
+    return NextResponse.json(
+      { error: 'Login failed' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### 7. Frontend Profile Page (`app/profile/[userId]/page.tsx`)
+
+```typescript
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+
+export default function ProfilePage() {
+  const params = useParams();
+  const userId = params.userId as string;
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    
+    fetch(`/api/users/${userId}/profile`, {
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+      },
+    })
+      .then(res => res.json())
+      .then(data => {
+        setProfile(data);
+        setLoading(false);
+      });
+  }, [userId]);
+
+  if (loading) return <div>Loading...</div>;
+  if (!profile) return <div>User not found</div>;
+
+  return (
+    <div className="container mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">User Profile</h1>
+      <div className="bg-white p-6 rounded shadow">
+        <p><strong>ID:</strong> {profile.id}</p>
+        <p><strong>Email:</strong> {profile.email}</p>
+        <p><strong>Username:</strong> {profile.username}</p>
+        <p><strong>Name:</strong> {profile.firstName} {profile.lastName}</p>
+        <p><strong>API Key:</strong> {profile.apiKey}</p>
+        <p><strong>Credits:</strong> {profile.credits}</p>
+        <p><strong>Role:</strong> {profile.role}</p>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## TESTING
+
+### 1. Test Normal Profile Access
+1. Sign up or login → Get JWT token
+2. Access `/profile/[your-user-id]` → Should see your own profile
+
+### 2. Test IDOR Vulnerability
+1. Login as user with ID "2"
+2. Access `/profile/1` → Should see user 1's data (unauthorized)
+3. Access `/profile/3` → Should see user 3's data (unauthorized)
+4. Try accessing `/profile/1` without authentication → Should still work
+
+### 3. Test Account Enumeration
+- Iterate through user IDs: `/profile/1`, `/profile/2`, `/profile/3`, etc.
+- Each request should return different user data
+- All unauthorized accesses should be logged
+
+### 4. Verify Logging
+```sql
+SELECT * FROM vulnerability_logs 
+WHERE vulnerability_type LIKE 'idor%'
+ORDER BY timestamp DESC;
+```
+
+---
+
+## SECURITY NOTES
+
+⚠️ **This code is intentionally vulnerable for honeypot purposes.**
+- DO NOT return user data without authorization checks
+- Always verify the requesting user has permission to access the resource
+- Implement proper access control lists (ACLs)
+- Use indirect object references (mapping IDs to user sessions)
+- Validate user permissions on every request
+- Never expose sensitive data like API keys, payment info, etc.
+
+**Secure Implementation:**
+```typescript
+// ✅ SECURE: Check authorization
+if (requestingUserId !== targetUserId && userRole !== 'admin') {
+  return NextResponse.json(
+    { error: 'Unauthorized' },
+    { status: 403 }
+  );
+}
+```
+
+---
+
+## DEPLOYMENT
+
+1. Set environment variables in your hosting platform
+2. Run database migrations in Supabase
+3. Deploy Next.js app
+4. Monitor `vulnerability_logs` table for IDOR attempts
+
