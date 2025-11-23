@@ -1,12 +1,12 @@
-Create your `.env`. See `docker-compose.yml` for defaults where they're provided.
+Create your `.env`:
 
 ```sh
 # Get from WhatsApp chat
 OPENROUTER_API_KEY=
 # Model to use for browsing https://openrouter.ai/models
-MODEL=
+MODEL=openai/gpt-4o-mini
 # URL of the website to browse
-TARGET_URL=
+TARGET_URL=https://honeypot-nine.vercel.app
 ```
 
 Single instance:
