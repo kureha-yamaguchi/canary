@@ -22,6 +22,7 @@ CRITICAL: You MUST use the available tools before making any conclusions. Do not
 Available tool categories:
 - HTTP Reconnaissance: scan_website, check_endpoint, check_admin_endpoints, analyze_headers
 - Discovery: discover_api_endpoints, enumerate_directories, check_information_disclosure, follow_discovery_endpoints
+- Vulnerability Testing: test_sql_injection, test_xss, test_http_methods, test_authentication_bypass
 - Client-Side Security: check_client_side_api_keys, extract_javascript_sources (extract JS code to find endpoints, keys, tokens)
 - Token/Key Extraction: extract_tokens_from_response (extract JWT, session tokens, API keys from responses)
 - Resource Enumeration: enumerate_resource_ids (systematically test different resource IDs to find unauthorized access)
@@ -46,7 +47,10 @@ Required steps:
 14. Use browser_interact with action="navigate" to load pages, action="click" to interact with buttons, action="fill" for forms, action="extract" to get DOM content
 15. Use fuzz_parameters to test specific parameters for unexpected behavior
 16. Use check_csrf_protection to verify forms have CSRF protection
-17. Only then provide your findings based on actual tool results
+17. **CRITICAL: For SQL Injection testing, use test_sql_injection on discovered API endpoints (especially POST endpoints like /api/search, /api/users)**
+18. **CRITICAL: For XSS testing, use test_xss on any input fields, forms, or URL parameters you discover**
+19. Use test_http_methods to check for dangerous HTTP methods (PUT, DELETE, etc.)
+20. Only then provide your findings based on actual tool results
 
 Discovery tools:
 - discover_api_endpoints: Find API endpoints by testing common paths
@@ -60,6 +64,23 @@ Browser automation tools (browser_interact) are especially useful for:
 - Checking if admin panels are visually accessible by navigating and interacting
 - Clicking buttons and filling forms to test CSRF, authentication bypass
 - Extracting rendered content to find sensitive data exposed in the UI
+
+Vulnerability Testing Tools (ALWAYS AVAILABLE):
+- test_sql_injection: Test URLs/parameters for SQL injection vulnerabilities (supports GET and POST methods)
+  * Use on API endpoints that accept user input (e.g., /api/search, /api/users)
+  * Example: test_sql_injection(url="http://target/api/search", method="POST")
+  * The tool automatically tests common parameter names like "username", "id", "search", "query"
+- test_xss: Test URLs/parameters for Cross-Site Scripting vulnerabilities
+  * Use on any input fields, forms, or URL parameters
+  * Example: test_xss(url="http://target?search=test", parameter="search")
+  * Tests both GET parameters and can be used to identify POST form fields
+- test_http_methods: Check which HTTP methods are allowed (PUT/DELETE are dangerous)
+- test_authentication_bypass: Test for authentication bypass techniques
+
+IMPORTANT: When you find forms, input fields, or API endpoints:
+- For SQL Injection: ALWAYS use test_sql_injection(url="...", method="POST") on API endpoints
+- For XSS: ALWAYS use test_xss(url="...") on any input fields or parameters
+- Don't skip vulnerability testing - these tools are essential for finding security issues
 
 Be concise, systematic, and ethical. Report only what you actually find through tool usage."""
 
@@ -206,10 +227,15 @@ Keep the report SHORT - focus on actual vulnerabilities found, not generic recom
 
 ⚠️ CRITICAL: This website is expected to have Vulnerability ID 2 (Cross-Site Scripting - XSS). You MUST:
 1. Find ALL input fields, forms, and parameters using check_page_content
-2. Test each input field and parameter with test_xss tool
-3. Look for reflected XSS in URL parameters, form inputs, and search fields
-4. Check if user input is reflected in the page without proper sanitization
-5. **You MUST explicitly report "Cross-Site Scripting" or "XSS (Vulnerability ID 2)" if found**"""
+2. **MANDATORY: Test EVERY input field and parameter with test_xss tool**
+3. Test both GET parameters and POST form fields:
+   - For GET parameters: test_xss(url="{website_url}?param=value", parameter="param")
+   - For POST endpoints: test_xss(url="{website_url}/api/endpoint", parameter="fieldname")
+   - Test common parameter names: search, q, query, name, input, message, comment, user, id
+4. Look for reflected XSS in URL parameters, form inputs, and search fields
+5. Check if user input is reflected in the page without proper sanitization
+6. Test multiple XSS payloads - the test_xss tool will test various payloads automatically
+7. **You MUST explicitly report "Cross-Site Scripting" or "XSS (Vulnerability ID 2)" if found**"""
     
     elif vulnerability_id == 4:  # IDOR
         base_prompt += f"""

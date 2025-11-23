@@ -95,9 +95,23 @@ def run_single_url(url: str, model: str, include_hints: bool = False, task: Opti
         
         elapsed = time.time() - start_time
         
+        # Check if result is valid
+        if result is None:
+            update_status(url, "❌", "No Result", elapsed=format_elapsed(elapsed))
+            return {
+                "success": False,
+                "error": "Orchestrator returned None",
+                "elapsed": elapsed
+            }
+        
         # Check if vulnerability was found
-        audit_result = result.get("auditor_result", {})
-        vulnerability_found = audit_result.get("vulnerability_found", False)
+        # The orchestrator returns vulnerability_found at the top level
+        # Also check nested structure as fallback
+        vulnerability_found = result.get("vulnerability_found", False)
+        if not vulnerability_found:
+            audit_result = result.get("auditor_result") or {}
+            if isinstance(audit_result, dict):
+                vulnerability_found = audit_result.get("audit_result", {}).get("vulnerability_found", False)
         
         if vulnerability_found:
             update_status(url, "✅", "Vulnerability Found", elapsed=format_elapsed(elapsed))
@@ -126,7 +140,7 @@ def run_single_url(url: str, model: str, include_hints: bool = False, task: Opti
         }
 
 
-def run_batch(runs_plan_path: str, model: str, include_hints: bool = False, task: Optional[str] = None):
+def run_batch(runs_plan_path: str, model: str, include_hints: bool = False, task: Optional[str] = None, use_local: bool = False):
     """Run batch processing for all URLs in runs plan"""
     # Load runs plan
     runs_plan_file = Path(runs_plan_path)
@@ -137,10 +151,17 @@ def run_batch(runs_plan_path: str, model: str, include_hints: bool = False, task
     with open(runs_plan_file, 'r') as f:
         runs_plan = json.load(f)
     
-    urls = runs_plan.get("urls", [])
-    if not urls:
-        print("❌ Error: No URLs found in runs plan")
-        sys.exit(1)
+    # Use localurls if requested, otherwise use urls
+    if use_local:
+        urls = runs_plan.get("localurls", [])
+        if not urls:
+            print("❌ Error: No localurls found in runs plan")
+            sys.exit(1)
+    else:
+        urls = runs_plan.get("urls", [])
+        if not urls:
+            print("❌ Error: No URLs found in runs plan")
+            sys.exit(1)
     
     # Initialize statuses
     for url in urls:
@@ -234,10 +255,16 @@ if __name__ == "__main__":
         help="Custom task/prompt for the red-team agent"
     )
     
+    parser.add_argument(
+        "--use-local",
+        action="store_true",
+        help="Use localurls from runs plan instead of urls"
+    )
+    
     args = parser.parse_args()
     
     try:
-        run_batch(args.runs_plan, args.model, include_hints=args.hints, task=args.task)
+        run_batch(args.runs_plan, args.model, include_hints=args.hints, task=args.task, use_local=args.use_local)
     except KeyboardInterrupt:
         print("\n\n⚠️  Batch run interrupted by user")
         print_status_bar(list(statuses.keys()), args.model)

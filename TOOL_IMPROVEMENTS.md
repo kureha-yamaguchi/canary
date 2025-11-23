@@ -68,6 +68,48 @@ Discover and follow API discovery endpoints like:
 **Tool Name**: `follow_api_discovery_links`
 **What it does**: Follows common API discovery endpoints and reports findings
 
+### 8. **Test Form Submission Flow & Redirects**
+Follow form submissions and test redirect destinations for reflected input vulnerabilities (XSS, JSONP callback injection). This is critical for finding vulnerabilities where:
+- Forms submit to an API endpoint
+- The API redirects to a confirmation/thank-you page
+- User input is reflected in the redirect URL parameters
+- The destination page renders user input without sanitization
+
+**Tool Name**: `test_form_flow`
+**What it does**: 
+1. Finds forms on a page (using check_page_content or browser_interact)
+2. Extracts form action, method, and input fields
+3. Submits the form with test payloads (XSS, SQL injection, etc.)
+4. Follows redirects (HTTP 302/307) to the final destination
+5. Tests the final destination URL for reflected input vulnerabilities
+6. Specifically tests all query parameters in the redirect URL with XSS payloads
+7. Checks if payloads are reflected in the response (unencoded)
+
+**Why it's needed**: The current agent fails to detect XSS in cases like:
+- Form submits to `/api/submit` (POST)
+- Server redirects to `/thank-you?name=<user_input>&ability=<user_input>`
+- The `/thank-you` page uses `dangerouslySetInnerHTML` to render the parameters
+- Agent never discovers or tests the `/thank-you` endpoint
+
+**Example usage**:
+```python
+test_form_flow(
+    url="http://localhost:3005/contact",
+    form_selector="form",  # or auto-detect
+    test_payloads=["<script>alert('XSS')</script>", "<img src=x onerror=alert(1)>"],
+    follow_redirects=True
+)
+# Returns: Found form submitting to /api/submit
+#          Followed redirect to /thank-you?name=<script>alert('XSS')</script>
+#          ⚠️ XSS VULNERABILITY: Payload reflected unencoded in /thank-you page
+```
+
+**Alternative simpler tool**: `test_reflected_endpoints`
+- Takes a list of endpoints that might reflect user input
+- Tests each endpoint with XSS payloads in all query parameters
+- Checks for unencoded reflection in response
+- Useful when agent discovers endpoints but doesn't test them for XSS
+
 ## Improved Instructions/Hints to Add
 
 ### For JWT Testing (Algorithm Confusion)
@@ -138,12 +180,170 @@ SYSTEMATIC TESTING APPROACHES:
 
 ## Recommended Next Steps
 
-1. Add `extract_javascript_sources` tool (general-purpose JS extraction)
-2. Add `enumerate_resource_ids` tool (general ID enumeration)
-3. Enhance `analyze_headers` or add `analyze_response_deeply` (better error analysis)
-4. Add `extract_tokens` tool (general token extraction)
-5. Add `follow_api_discovery_links` tool (follow JWKS, swagger, etc.)
-6. Update system prompt with general testing patterns and hints
+1. **PRIORITY: Add `test_form_flow` tool** - Critical for detecting XSS/JSONP callback injection in form submission flows
+2. Add `extract_javascript_sources` tool (general-purpose JS extraction)
+3. Add `enumerate_resource_ids` tool (general ID enumeration)
+4. Enhance `analyze_headers` or add `analyze_response_deeply` (better error analysis)
+5. Add `extract_tokens` tool (general token extraction)
+6. Add `follow_api_discovery_links` tool (follow JWKS, swagger, etc.)
+7. Update system prompt with general testing patterns and hints
 
 These general tools will help the agent discover vulnerabilities naturally rather than having specific testers for each vulnerability type.
+
+## Implementation Example: `test_form_flow`
+
+Here's a detailed implementation suggestion for the `test_form_flow` tool:
+
+```python
+@tool
+def test_form_flow(
+    url: str, 
+    form_selector: Optional[str] = None,
+    follow_redirects: bool = True,
+    test_xss: bool = True,
+    test_sql_injection: bool = False
+) -> str:
+    """
+    Test form submission flow and follow redirects to detect reflected input vulnerabilities.
+    
+    This tool is critical for finding XSS vulnerabilities where:
+    - Forms submit to an API endpoint
+    - Server redirects to a confirmation page with user input in URL
+    - The destination page renders user input without sanitization
+    
+    Args:
+        url: The URL containing the form to test
+        form_selector: Optional CSS selector for the form (default: auto-detect first form)
+        follow_redirects: Whether to follow redirects after form submission
+        test_xss: Whether to test for XSS vulnerabilities in redirect destination
+        test_sql_injection: Whether to test for SQL injection (optional)
+    
+    Returns:
+        String containing test results and discovered vulnerabilities
+    """
+    from urllib.parse import urlparse, parse_qs, urlencode
+    import re
+    
+    results = []
+    vulnerabilities = []
+    
+    # Step 1: Get the page and find forms
+    try:
+        response = requests.get(url, timeout=config.REQUEST_TIMEOUT)
+        html = response.text
+        
+        # Find form elements
+        form_pattern = r'<form[^>]*action=["\']([^"\']*)["\'][^>]*method=["\']([^"\']*)["\']'
+        forms = re.findall(form_pattern, html, re.IGNORECASE)
+        
+        if not forms:
+            return "No forms found on the page"
+        
+        # Get first form or specified form
+        form_action, form_method = forms[0]
+        form_method = form_method.upper() if form_method else 'POST'
+        
+        # Extract input fields
+        input_pattern = r'<input[^>]*name=["\']([^"\']*)["\']'
+        input_fields = re.findall(input_pattern, html, re.IGNORECASE)
+        
+        results.append(f"Found form: action={form_action}, method={form_method}")
+        results.append(f"Input fields: {', '.join(input_fields)}")
+        
+        # Step 2: Submit form with test payloads
+        parsed = urlparse(url)
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        submit_url = urljoin(base_url, form_action) if form_action else url
+        
+        # XSS test payloads
+        xss_payloads = [
+            "<script>alert('XSS')</script>",
+            "<img src=x onerror=alert('XSS')>",
+            "<svg onload=alert('XSS')>",
+        ]
+        
+        for payload in xss_payloads:
+            # Prepare form data
+            form_data = {}
+            for field in input_fields[:3]:  # Test first 3 fields
+                form_data[field] = payload
+            
+            try:
+                if form_method == 'POST':
+                    response = requests.post(
+                        submit_url,
+                        data=form_data,
+                        allow_redirects=follow_redirects,
+                        timeout=config.REQUEST_TIMEOUT
+                    )
+                else:
+                    # GET request
+                    response = requests.get(
+                        submit_url,
+                        params=form_data,
+                        allow_redirects=follow_redirects,
+                        timeout=config.REQUEST_TIMEOUT
+                    )
+                
+                # Step 3: Check final destination URL
+                final_url = response.url
+                results.append(f"Form submission redirected to: {final_url}")
+                
+                # Step 4: Test redirect destination for reflected input
+                if test_xss and follow_redirects:
+                    # Extract query parameters from redirect URL
+                    redirect_parsed = urlparse(final_url)
+                    redirect_params = parse_qs(redirect_parsed.query)
+                    
+                    # Check if payload is reflected in the response
+                    if payload in response.text:
+                        vulnerabilities.append(
+                            f"⚠️ XSS VULNERABILITY: Payload '{payload[:30]}...' reflected unencoded in {final_url}"
+                        )
+                    elif any(payload in str(v) for v in redirect_params.values()):
+                        # Payload is in URL parameters - test if it's rendered
+                        if '<script>' in response.text.lower() or 'onerror=' in response.text.lower():
+                            vulnerabilities.append(
+                                f"⚠️ POTENTIAL XSS: Payload in URL parameters of {final_url} may be executed"
+                            )
+                    
+                    # Test each parameter in redirect URL with XSS payloads
+                    for param_name in redirect_params.keys():
+                        test_params = redirect_params.copy()
+                        test_params[param_name] = [payload]
+                        test_url = f"{redirect_parsed.scheme}://{redirect_parsed.netloc}{redirect_parsed.path}?{urlencode(test_params, doseq=True)}"
+                        
+                        test_response = requests.get(test_url, timeout=config.REQUEST_TIMEOUT)
+                        if payload in test_response.text:
+                            vulnerabilities.append(
+                                f"🚨 XSS VULNERABILITY: Parameter '{param_name}' in {final_url} reflects payload unencoded"
+                            )
+                
+            except requests.exceptions.RequestException as e:
+                results.append(f"Error testing form submission: {str(e)}")
+        
+    except requests.exceptions.RequestException as e:
+        return f"Error accessing {url}: {str(e)}"
+    
+    output = []
+    if vulnerabilities:
+        output.append("🚨 VULNERABILITIES FOUND:")
+        output.extend(vulnerabilities)
+        output.append("")
+    output.append("Form Flow Test Results:")
+    output.extend(results)
+    
+    return "\n".join(output) if output else "No vulnerabilities detected in form flow"
+```
+
+**Key features:**
+1. Automatically discovers forms on a page
+2. Extracts form action, method, and input fields
+3. Submits form with XSS payloads
+4. Follows redirects to final destination
+5. Tests redirect URL parameters for reflected input
+6. Checks if payloads are reflected unencoded in the response
+
+**Usage in prompts:**
+Add to system prompt: "When you find forms on a page, use `test_form_flow` to test the complete submission flow including redirects. This is critical for finding XSS vulnerabilities where user input is reflected in redirect destination URLs."
 

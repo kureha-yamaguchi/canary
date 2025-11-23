@@ -104,8 +104,62 @@ def detect_vulnerability_from_url(website_url: str) -> Optional[Dict[str, Any]]:
             # Check each URL mapping
             for mapping in url_mappings.get("url_mappings", []):
                 url_pattern = mapping.get("url_pattern", "")
-                # Check if the hostname contains the pattern
+                local_url = mapping.get("local_url", "")
+                
+                # Check if the hostname contains the pattern (for deployed websites)
                 if url_pattern and url_pattern in url_host:
+                    vulnerability_ids = mapping.get("vulnerability_ids", [])
+                    if vulnerability_ids:
+                        # Use the first vulnerability ID
+                        vuln_id = vulnerability_ids[0]
+                        vuln_data = vulnerabilities.get(vuln_id, {})
+                        
+                        # Get MITRE techniques from vulnerability data
+                        mitre_techniques = []
+                        if vuln_data.get("mitre_attack"):
+                            mitre_id = vuln_data["mitre_attack"].get("technique_id", "")
+                            if mitre_id:
+                                mitre_techniques = [mitre_id]
+                        
+                        return {
+                            "vulnerability_id": vuln_id,
+                            "vulnerability_name": vuln_data.get("name", mapping.get("vulnerability_types", [""])[0] if mapping.get("vulnerability_types") else "Unknown"),
+                            "description": mapping.get("description", vuln_data.get("description", "")),
+                            "website_id": None,
+                            "website_name": None,
+                            "port": None,
+                            "mitre_techniques": mitre_techniques
+                        }
+                
+                # Also check local_url for localhost matching (for local testing)
+                if local_url:
+                    # Parse local_url to extract hostname and port
+                    local_parsed = urlparse(local_url if "://" in local_url else f"http://{local_url}")
+                    local_host = local_parsed.hostname or ""
+                    local_port = local_parsed.port or (443 if local_parsed.scheme == "https" else 80 if local_parsed.scheme == "http" else None)
+                    
+                    # Match localhost URLs by port
+                    if url_host in ["localhost", "127.0.0.1"] and url_port and local_port and url_port == local_port:
+                        vulnerability_ids = mapping.get("vulnerability_ids", [])
+                        if vulnerability_ids:
+                            vuln_id = vulnerability_ids[0]
+                            vuln_data = vulnerabilities.get(vuln_id, {})
+                            
+                            mitre_techniques = []
+                            if vuln_data.get("mitre_attack"):
+                                mitre_id = vuln_data["mitre_attack"].get("technique_id", "")
+                                if mitre_id:
+                                    mitre_techniques = [mitre_id]
+                            
+                            return {
+                                "vulnerability_id": vuln_id,
+                                "vulnerability_name": vuln_data.get("name", mapping.get("vulnerability_types", [""])[0] if mapping.get("vulnerability_types") else "Unknown"),
+                                "description": mapping.get("description", vuln_data.get("description", "")),
+                                "website_id": None,
+                                "website_name": None,
+                                "port": url_port,
+                                "mitre_techniques": mitre_techniques
+                            }
                     vulnerability_ids = mapping.get("vulnerability_ids", [])
                     if vulnerability_ids:
                         # Use the first vulnerability ID

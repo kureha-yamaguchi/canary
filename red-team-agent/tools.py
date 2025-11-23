@@ -531,69 +531,88 @@ def test_sql_injection(url: str, parameter: Optional[str] = None, method: str = 
                 test_params_dict[param] = [payload]
                 test_url = f"{base_url}?{urlencode(test_params_dict, doseq=True)}"
                 
-                try:
-                    response = requests.get(test_url, timeout=config.REQUEST_TIMEOUT)
-                    
-                    # Check for SQL error indicators
-                    sql_errors = [
-                        'sql syntax', 'mysql', 'postgresql', 'oracle', 'sqlite',
-                        'sql error', 'database error', 'query failed',
-                        'unclosed quotation', 'syntax error'
-                    ]
-                    
-                    response_lower = response.text.lower()
-                    found_errors = [err for err in sql_errors if err in response_lower]
-                    
-                    # Check for successful injection indicators
-                    response_json = None
+                # Retry logic for transient failures
+                max_retries = 3
+                last_error = None
+                for attempt in range(max_retries):
                     try:
-                        response_json = response.json()
-                    except:
-                        pass
-                    
-                    # Check if response indicates successful SQL injection
-                    injection_indicators = [
-                        'sql injection', 'injection detected', 'injection successful',
-                        'returned', 'records', 'query:', 'SELECT'
-                    ]
-                    found_indicators = [ind for ind in injection_indicators if ind in response_lower]
-                    
-                    if found_errors:
-                        vulnerable.append(f"GET {param} with payload '{payload}': Found SQL error indicators: {', '.join(found_errors)}")
-                        # Log to Supabase
-                        log_sql_injection_attempt(
-                            url=test_url,
-                            payload=payload,
-                            method="GET",
-                            parameter=param,
-                            success=True,
-                            response_indicators=found_errors
-                        )
-                    elif found_indicators or (response_json and isinstance(response_json, dict) and 'warning' in response_json):
-                        vulnerable.append(f"GET {param} with payload '{payload}': SQL injection successful - {', '.join(found_indicators) if found_indicators else 'injection detected in response'}")
-                        # Log to Supabase
-                        log_sql_injection_attempt(
-                            url=test_url,
-                            payload=payload,
-                            method="GET",
-                            parameter=param,
-                            success=True,
-                            response_indicators=found_indicators if found_indicators else ['injection detected in response']
-                        )
-                    elif response.status_code == 500:
-                        results.append(f"GET {param} with payload '{payload}': Status 500 (possible SQL error)")
-                        # Log suspicious attempt
-                        log_sql_injection_attempt(
-                            url=test_url,
-                            payload=payload,
-                            method="GET",
-                            parameter=param,
-                            success=False,
-                            response_indicators=['status_500']
-                        )
+                        response = requests.get(test_url, timeout=config.REQUEST_TIMEOUT)
                         
-                except requests.exceptions.RequestException as e:
-                    results.append(f"GET {param} with payload '{payload}': Error - {str(e)}")
+                        # Check for SQL error indicators
+                        sql_errors = [
+                            'sql syntax', 'mysql', 'postgresql', 'oracle', 'sqlite',
+                            'sql error', 'database error', 'query failed',
+                            'unclosed quotation', 'syntax error'
+                        ]
+                        
+                        response_lower = response.text.lower()
+                        found_errors = [err for err in sql_errors if err in response_lower]
+                        
+                        # Check for successful injection indicators
+                        response_json = None
+                        try:
+                            response_json = response.json()
+                        except:
+                            pass
+                        
+                        # Check if response indicates successful SQL injection
+                        injection_indicators = [
+                            'sql injection', 'injection detected', 'injection successful',
+                            'returned', 'records', 'query:', 'SELECT'
+                        ]
+                        found_indicators = [ind for ind in injection_indicators if ind in response_lower]
+                        
+                        if found_errors:
+                            vulnerable.append(f"GET {param} with payload '{payload}': Found SQL error indicators: {', '.join(found_errors)}")
+                            # Log to Supabase
+                            log_sql_injection_attempt(
+                                url=test_url,
+                                payload=payload,
+                                method="GET",
+                                parameter=param,
+                                success=True,
+                                response_indicators=found_errors
+                            )
+                        elif found_indicators or (response_json and isinstance(response_json, dict) and 'warning' in response_json):
+                            vulnerable.append(f"GET {param} with payload '{payload}': SQL injection successful - {', '.join(found_indicators) if found_indicators else 'injection detected in response'}")
+                            # Log to Supabase
+                            log_sql_injection_attempt(
+                                url=test_url,
+                                payload=payload,
+                                method="GET",
+                                parameter=param,
+                                success=True,
+                                response_indicators=found_indicators if found_indicators else ['injection detected in response']
+                            )
+                        elif response.status_code == 500:
+                            results.append(f"GET {param} with payload '{payload}': Status 500 (possible SQL error)")
+                            # Log suspicious attempt
+                            log_sql_injection_attempt(
+                                url=test_url,
+                                payload=payload,
+                                method="GET",
+                                parameter=param,
+                                success=False,
+                                response_indicators=['status_500']
+                            )
+                        
+                        # Success - break retry loop
+                        break
+                            
+                    except requests.exceptions.Timeout:
+                        last_error = f"Timeout after {config.REQUEST_TIMEOUT}s"
+                        if attempt < max_retries - 1:
+                            import time
+                            time.sleep(0.5)  # Brief delay before retry
+                        else:
+                            results.append(f"GET {param} with payload '{payload}': {last_error} (after {max_retries} attempts)")
+                    except requests.exceptions.RequestException as e:
+                        last_error = str(e)
+                        if attempt < max_retries - 1:
+                            import time
+                            time.sleep(0.5)  # Brief delay before retry
+                        else:
+                            results.append(f"GET {param} with payload '{payload}': Error - {last_error} (after {max_retries} attempts)")
     
     # Test POST requests (JSON body)
     if "POST" in methods_to_test:
@@ -748,19 +767,38 @@ def test_xss(url: str, parameter: Optional[str] = None) -> str:
             test_params[param] = [payload]
             test_url = f"{base_url}?{urlencode(test_params, doseq=True)}"
             
-            try:
-                response = requests.get(test_url, timeout=config.REQUEST_TIMEOUT)
-                
-                # Check if payload is reflected in response (unencoded)
-                if payload in response.text:
-                    vulnerable.append(f"{param}: XSS payload reflected unencoded in response")
-                elif payload.replace("'", "&#39;") in response.text or payload.replace("'", "&apos;") in response.text:
-                    results.append(f"{param}: Payload reflected but appears to be encoded")
-                elif "<script>" in payload.lower() and "<script>" in response.text.lower():
-                    vulnerable.append(f"{param}: Script tag detected in response")
+            # Retry logic for transient failures
+            max_retries = 3
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    response = requests.get(test_url, timeout=config.REQUEST_TIMEOUT)
                     
-            except requests.exceptions.RequestException as e:
-                results.append(f"{param} with payload: Error - {str(e)}")
+                    # Check if payload is reflected in response (unencoded)
+                    if payload in response.text:
+                        vulnerable.append(f"{param}: XSS payload reflected unencoded in response")
+                    elif payload.replace("'", "&#39;") in response.text or payload.replace("'", "&apos;") in response.text:
+                        results.append(f"{param}: Payload reflected but appears to be encoded")
+                    elif "<script>" in payload.lower() and "<script>" in response.text.lower():
+                        vulnerable.append(f"{param}: Script tag detected in response")
+                    
+                    # Success - break retry loop
+                    break
+                        
+                except requests.exceptions.Timeout:
+                    last_error = f"Timeout after {config.REQUEST_TIMEOUT}s"
+                    if attempt < max_retries - 1:
+                        import time
+                        time.sleep(0.5)  # Brief delay before retry
+                    else:
+                        results.append(f"{param} with payload: {last_error} (after {max_retries} attempts)")
+                except requests.exceptions.RequestException as e:
+                    last_error = str(e)
+                    if attempt < max_retries - 1:
+                        import time
+                        time.sleep(0.5)  # Brief delay before retry
+                    else:
+                        results.append(f"{param} with payload: Error - {last_error} (after {max_retries} attempts)")
     
     output = []
     if vulnerable:

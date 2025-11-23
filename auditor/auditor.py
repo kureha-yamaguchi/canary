@@ -94,7 +94,7 @@ class AuditorAgent:
         if len(detected_vulns) > 1:
             # Check if all vulnerabilities are from URL mapping
             all_from_url_mapping = all(
-                vuln.get('mapping_file', '').startswith('url-mapping:') 
+                (vuln.get('mapping_file') or '').startswith('url-mapping:') 
                 for vuln in detected_vulns
             )
             
@@ -530,8 +530,13 @@ class AuditorAgent:
             keywords.extend(technical_terms_map['html data'])
         elif 'sql injection' in mapping_lower or 'sql-injection' in mapping_lower:
             keywords.extend(technical_terms_map['sql injection'])
-        elif 'xss' in mapping_lower or 'cross-site scripting' in mapping_lower:
+            # Add more SQL injection variations
+            keywords.extend(['sql', 'database injection', 'sql injection vulnerability', 'sqli'])
+        elif 'xss' in mapping_lower or 'cross-site scripting' in mapping_lower or 'cross site scripting' in mapping_lower:
             keywords.extend(technical_terms_map['xss'])
+            # Add more XSS variations for better matching
+            keywords.extend(['xss vulnerability', 'script injection', 'javascript injection', 
+                           'reflected script', 'stored script', 'dom xss', 'reflected xss', 'stored xss'])
         
         # Remove duplicates and return
         keywords = list(set(keywords))
@@ -589,6 +594,32 @@ class AuditorAgent:
                 else:
                     # Single word name - check it's not just a partial match
                     if re.search(r'\b' + re.escape(vulnerability_name_lower) + r'\b', finding_lower):
+                        matching_findings.append(finding)
+                        matched = True
+            
+            # Additional flexible matching for common vulnerability types
+            if not matched:
+                # XSS matching - be more flexible
+                if 'xss' in vulnerability_name_lower or 'cross-site scripting' in vulnerability_name_lower:
+                    xss_patterns = ['xss', 'cross.site.scripting', 'cross site scripting', 
+                                  'script injection', 'javascript injection', 'reflected script']
+                    if any(pattern in finding_lower for pattern in xss_patterns):
+                        matching_findings.append(finding)
+                        matched = True
+                
+                # SQL Injection matching - be more flexible
+                elif 'sql injection' in vulnerability_name_lower or 'sql-injection' in vulnerability_name_lower:
+                    sql_patterns = ['sql injection', 'sql-injection', 'sqli', 'database injection', 
+                                  'sql error', 'sql query']
+                    if any(pattern in finding_lower for pattern in sql_patterns):
+                        matching_findings.append(finding)
+                        matched = True
+                
+                # IDOR matching
+                elif 'idor' in vulnerability_name_lower or 'insecure direct object reference' in vulnerability_name_lower:
+                    idor_patterns = ['idor', 'insecure direct object reference', 'unauthorized access',
+                                   'access other user', 'resource enumeration']
+                    if any(pattern in finding_lower for pattern in idor_patterns):
                         matching_findings.append(finding)
                         matched = True
             
