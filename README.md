@@ -18,34 +18,34 @@ In the landscape where offensive AI capabilities can spread in seconds, scalable
   <table>
     <tr>
       <td align="center">
-        <img src="headshot.png" width="120px;" alt="Shay Yahal"/><br />
+        <img src="data/headshot.png" width="120px;" alt="Shay Yahal"/><br />
         <sub><b>Shay Yahal</b></sub><br />
       </td>
       <td align="center">
-        <img src="headshot.png" width="120px;" alt="Chris Chochran"/><br />
+        <img src="data/headshot.png" width="120px;" alt="Chris Chochran"/><br />
         <sub><b>Chris Chochran</b></sub><br />
       </td>
       <td align="center">
-        <img src="headshot.png" width="120px;" alt="Syed Hussain"/><br />
+        <img src="data/headshot.png" width="120px;" alt="Syed Hussain"/><br />
         <sub><b>Syed Hussain</b></sub><br />
       </td>
       <td align="center">
-        <img src="headshot.png" width="120px;" alt="Oliver Normand"/><br />
+        <img src="data/headshot.png" width="120px;" alt="Oliver Normand"/><br />
         <sub><b>Oliver Normand</b></sub><br />
       </td>
     </tr>
     <tr>
       <td align="center">
-        <img src="headshot.png" width="120px;" alt="Jacob Davies"/><br />
+        <img src="data/headshot.png" width="120px;" alt="Jacob Davies"/><br />
         <sub><b>Jacob Davies</b></sub><br />
       </td>
       <td align="center">
-        <img src="headshot.png" width="120px;" alt="Zak Walters"/><br />
+        <img src="data/headshot.png" width="120px;" alt="Zak Walters"/><br />
         <sub><b>Name</b></sub><br />
         <sub>Affiliation</sub>
       </td>
       <td align="center">
-        <img src="headshot.png" width="120px;" alt="Kureha Yamaguchi"/><br />
+        <img src="data/headshot.png" width="120px;" alt="Kureha Yamaguchi"/><br />
         <sub><b>Kureha Yamaguchi</b></sub><br />
       </td>
       <td></td>
