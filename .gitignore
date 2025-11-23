@@ -28,3 +28,5 @@ env/
 .venv/
 
 multi-website-builder/websites
+
+red-react-agent/red_react_agent/logs

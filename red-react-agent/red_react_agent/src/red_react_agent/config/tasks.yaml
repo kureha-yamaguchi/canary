@@ -1,0 +1,44 @@
+recon_task:
+  description: >
+    Map the target {website}. Steps: render the page, extract forms/actions/input names, collect clickable targets
+    (links, buttons/CTAs), do a stateful click exploration (reusing cookies) with screenshots per hop, analyze headers,
+    check allowed HTTP methods, enumerate common admin/API paths, list on-scope links, scan for secret/API key/JWT leaks
+    and permissive CORS, and take a full-page screenshot
+    (wait ~6s, scroll to bottom) for visual cues. Use the multimodal image tool to briefly analyze the screenshot for
+    UI clues (buttons, CTAs, hidden forms). Return structured notes that testers can use (form actions, methods,
+    parameters, likely API endpoints) and mention screenshot path if captured.
+  expected_output: >
+    JSON-style bullets capturing: forms [{action, method, inputs}], headers issues, HTTP methods allowed,
+    discovered API/admin paths, notable links/click targets (links/buttons), stateful hop URLs/titles/screenshots,
+    leak findings (secrets/JWTs), CORS notes, and screenshot path + short visual observations if available.
+  agent: recon_agent
+
+exploit_task:
+  description: >
+    Using recon outputs, test the target {website} endpoints and forms for SQLi, XSS, CSRF gaps, JWT/CORS weaknesses,
+    auth bypass, and fuzz forms/buttons with payloads while reusing cookies/state where possible. Prioritize form actions
+    and API endpoints. Include payloads used and evidence snippets. Decode any JWTs found for weak claims/alg hints; note
+    any leaked keys/tokens. Capture screenshots for risky flows when useful.
+  expected_output: >
+    Structured findings list with fields: issue_type, target, payload/variant, evidence (status/body snippet),
+    and confidence (high/medium/low).
+  agent: tester_agent
+  context: [recon_task]
+
+audit_task:
+  description: >
+    Validate and de-duplicate findings. Keep only those with tool evidence. Mark scope compliance for {website}.
+  expected_output: >
+    Validated findings with brief justification; drop weak/duplicate items.
+  agent: auditor_agent
+  context: [recon_task, exploit_task]
+
+report_task:
+  description: >
+    Produce a concise report: (1) Steps performed, (2) Validated findings with evidence, (3) Recommendations per issue.
+    Keep it short and focused on exploitable issues. Format as Markdown without code fences.
+  expected_output: >
+    Markdown report with sections: Steps, Findings, Recommendations. One bullet per item.
+  agent: reporter_agent
+  output_file: report.md
+  context: [recon_task, exploit_task, audit_task]
