@@ -28,9 +28,9 @@ export default async function Home() {
   const { attacks24h, successRate } = await getStats();
 
   return (
-    <div className="min-h-screen relative noise-bg">
+    <div className="min-h-screen relative bg-[#F5F5F7] dark:bg-charcoal">
       {/* Status Bar */}
-      <div className="fixed top-0 left-0 right-0 border-b-[3px] border-charcoal dark:border-cream bg-cream dark:bg-charcoal z-50">
+      <div className="fixed top-0 left-0 right-0 border-b border-charcoal dark:border-cream bg-white dark:bg-charcoal z-50">
         <div className="px-6 py-3 flex items-center justify-between font-mono text-xs tracking-wider">
           <div className="flex gap-6">
             <span className="text-cyan flex items-center gap-2">
@@ -61,7 +61,7 @@ export default async function Home() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Live Dashboard */}
             <Link href="/dashboard">
-              <div className="border-[3px] border-charcoal dark:border-cream p-6 hover:border-cyan hover:bg-cyan/5 transition-all cursor-pointer group min-h-80 flex flex-col justify-between">
+              <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-6 hover:border-cyan hover:bg-cyan/5 transition-all cursor-pointer group min-h-80 flex flex-col justify-between">
                 <div>
                   <div className="text-cyan text-4xl mb-3 font-mono">[01]</div>
                   <h2 className="text-2xl font-bold mb-2 group-hover:text-cyan transition-colors font-[family-name:var(--font-ibm-plex-mono)]">
@@ -71,11 +71,11 @@ export default async function Home() {
                     Monitor attacks in real-time, view statistics, and analyze threat patterns.
                   </p>
                   <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="border-[2px] border-charcoal dark:border-cream p-3">
+                    <div className="border border-charcoal dark:border-cream p-3">
                       <div className="text-xs text-ghost mb-1">24H_ATTACKS</div>
                       <div className="text-2xl font-bold text-amber">{attacks24h.toLocaleString()}</div>
                     </div>
-                    <div className="border-[2px] border-charcoal dark:border-cream p-3">
+                    <div className="border border-charcoal dark:border-cream p-3">
                       <div className="text-xs text-ghost mb-1">SUCCESS_RATE</div>
                       <div className="text-2xl font-bold text-cyan">{successRate.toFixed(1)}%</div>
                     </div>
@@ -89,7 +89,7 @@ export default async function Home() {
 
             {/* MITRE Matrix */}
             <Link href="/matrix">
-              <div className="border-[3px] border-charcoal dark:border-cream p-6 hover:border-cyan hover:bg-cyan/5 transition-all cursor-pointer group min-h-80 flex flex-col justify-between">
+              <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-6 hover:border-cyan hover:bg-cyan/5 transition-all cursor-pointer group min-h-80 flex flex-col justify-between">
                 <div>
                   <div className="text-cyan text-4xl mb-3 font-mono">[02]</div>
                   <h2 className="text-2xl font-bold mb-2 group-hover:text-cyan transition-colors font-[family-name:var(--font-ibm-plex-mono)]">

@@ -152,3 +152,38 @@ BEGIN
   RETURN result;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Function to get recent attacks (for live feed)
+CREATE OR REPLACE FUNCTION get_recent_attacks(
+  limit_count INT DEFAULT 50,
+  include_synthetic BOOLEAN DEFAULT false
+)
+RETURNS TABLE (
+  id UUID,
+  timestamp TIMESTAMP WITH TIME ZONE,
+  base_url TEXT,
+  vulnerability_type TEXT,
+  technique_id TEXT,
+  attacker_id TEXT,
+  success BOOLEAN,
+  attack_vector TEXT,
+  is_synthetic BOOLEAN
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    v.id,
+    v.timestamp,
+    v.base_url,
+    v.vulnerability_type,
+    v.technique_id,
+    v.attacker_id,
+    v.success,
+    v.attack_vector,
+    v.is_synthetic
+  FROM vulnerability_logs v
+  WHERE (include_synthetic OR v.is_synthetic IS NULL OR v.is_synthetic = false)
+  ORDER BY v.timestamp DESC
+  LIMIT limit_count;
+END;
+$$ LANGUAGE plpgsql;

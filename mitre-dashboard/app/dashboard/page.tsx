@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { LiveAttacksFeed } from '../components/LiveAttacksFeed';
 
 interface HistogramDataPoint {
   time_bucket: string;
@@ -588,54 +589,62 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Histogram */}
-        <div className="border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold tracking-tighter font-[family-name:var(--font-ibm-plex-mono)]">
-              ATTACK_VOLUME_BY_TACTIC
-            </h2>
-            <div className="text-xs text-ghost">Stacked histogram showing attack distribution</div>
+        {/* Main Content Grid - Histogram and Live Attacks */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Histogram - Takes up 2 columns */}
+          <div className="lg:col-span-2 border border-charcoal dark:border-cream bg-white dark:bg-charcoal p-6">
+            <div className="mb-4">
+              <h2 className="text-xl font-bold tracking-tighter font-[family-name:var(--font-ibm-plex-mono)]">
+                ATTACK_VOLUME_BY_TACTIC
+              </h2>
+              <div className="text-xs text-ghost">Stacked histogram showing attack distribution</div>
+            </div>
+
+            {loading ? (
+              <div className="h-64 flex items-center justify-center text-ghost">
+                [LOADING_DATA...]
+              </div>
+            ) : chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={chartData} barCategoryGap={0}>
+                  <XAxis
+                    dataKey="time"
+                    stroke="#9B9B9B"
+                    style={{ fontSize: '10px', fontFamily: 'monospace' }}
+                  />
+                  <YAxis
+                    stroke="#9B9B9B"
+                    style={{ fontSize: '10px', fontFamily: 'monospace' }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #1A1A1D',
+                      fontFamily: 'monospace',
+                      fontSize: '12px'
+                    }}
+                  />
+                  {uniqueTactics.map(tactic => (
+                    <Bar
+                      key={tactic}
+                      dataKey={tactic}
+                      stackId="a"
+                      fill={TACTIC_COLORS[tactic] || '#9B9B9B'}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-ghost">
+                [NO_DATA_AVAILABLE]
+              </div>
+            )}
           </div>
 
-          {loading ? (
-            <div className="h-64 flex items-center justify-center text-ghost">
-              [LOADING_DATA...]
-            </div>
-          ) : chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData} barCategoryGap={0}>
-                <XAxis
-                  dataKey="time"
-                  stroke="#9B9B9B"
-                  style={{ fontSize: '10px', fontFamily: 'monospace' }}
-                />
-                <YAxis
-                  stroke="#9B9B9B"
-                  style={{ fontSize: '10px', fontFamily: 'monospace' }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#FFFFFF',
-                    border: '1px solid #1A1A1D',
-                    fontFamily: 'monospace',
-                    fontSize: '12px'
-                  }}
-                />
-                {uniqueTactics.map(tactic => (
-                  <Bar
-                    key={tactic}
-                    dataKey={tactic}
-                    stackId="a"
-                    fill={TACTIC_COLORS[tactic] || '#9B9B9B'}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-ghost">
-              [NO_DATA_AVAILABLE]
-            </div>
-          )}
+          {/* Live Attacks Feed - Takes up 1 column */}
+          <div className="lg:col-span-1">
+            <LiveAttacksFeed includeSynthetic={includeSynthetic} />
+          </div>
         </div>
       </div>
     </div>
