@@ -41,8 +41,7 @@ In the landscape where offensive AI capabilities can spread in seconds, scalable
       </td>
       <td align="center">
         <img src="data/headshot.png" width="120px;" alt="Zak Walters"/><br />
-        <sub><b>Name</b></sub><br />
-        <sub>Affiliation</sub>
+        <sub><b>Zak Walters</b></sub><br />
       </td>
       <td align="center">
         <img src="data/headshot.png" width="120px;" alt="Kureha Yamaguchi"/><br />
