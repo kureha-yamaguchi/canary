@@ -1,14 +1,17 @@
-"""Simple run function for the Red Team Agent"""
+"""Simple run function for the Red Team Agent - runs full crew (red-team, auditor, ttp-master)"""
 import sys
 import os
 import argparse
 import textwrap
+from pathlib import Path
 
-# Add current directory to path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
+# Add paths for orchestrator
+base_dir = Path(__file__).parent.parent
+orchestrator_dir = base_dir / "orchestrator"
+sys.path.insert(0, str(orchestrator_dir))
 
-from agent import activate_agent
+# Import orchestrator
+from orchestrator import run_orchestrator
 
 # Default website (the one we've been using)
 DEFAULT_WEBSITE = "https://v0.app/chat/blog-with-hidden-vulnerability-rVsrXU04WBX"
@@ -31,70 +34,30 @@ def print_wrapped(text: str, prefix: str, width: int = 76):
 
 
 def run(model: str = None, website: str = DEFAULT_WEBSITE, 
-        open_browser: bool = False, playwright: bool = False) -> dict:
+        open_browser: bool = False, playwright: bool = False,
+        skip_audit: bool = False) -> dict:
     """
-    Simple function to run the red team agent
+    Run the full crew: red-team agent, auditor, and ttp-master
     
     Args:
         model: Model to use (e.g., 'openai/gpt-4o', 'openai/o3-mini'). Defaults to config default
         website: Website URL to test. Defaults to the test vulnerability website
         open_browser: If True, open website in browser during testing
         playwright: If True and open_browser is True, use Playwright for browser automation
+        skip_audit: If True, skip running auditor and ttp-master (only run red-team agent)
     
     Returns:
-        Agent execution result dictionary
+        Orchestrator result dictionary with all agent results
     """
-    # Minimal header
-    print(f"\n🔴 Testing: {website}")
-    print(f"🤖 Model: {model or 'default'}\n")
-    
-    result = activate_agent(
+    # Use orchestrator to run the full crew
+    result = run_orchestrator(
         website_url=website,
         model=model,
         open_browser=open_browser,
-        use_playwright=playwright
+        playwright=playwright,
+        skip_audit=skip_audit,
+        save_audit_report=True
     )
-    
-    # Clean results output
-    print("\n" + "─" * 60)
-    print("✅ RESULTS")
-    print("─" * 60)
-    
-    structured = result.get("structured", {})
-    verification_steps = structured.get("verification_steps", [])
-    findings = structured.get("findings", [])
-    recommendations = structured.get("recommendations", [])
-    
-    # Print all Verification Steps
-    if verification_steps:
-        print(f"\n📋 Verification Steps ({len(verification_steps)}):")
-        for i, step in enumerate(verification_steps, 1):
-            step_text = step.strip()
-            if step_text:
-                print_wrapped(step_text, f"  {i}. ", width=76)
-    else:
-        print("\n📋 Verification Steps: None extracted")
-    
-    # Print all Findings
-    if findings:
-        print(f"\n🔍 Findings ({len(findings)}):")
-        for i, finding in enumerate(findings, 1):
-            finding_text = finding.strip()
-            if finding_text:
-                print_wrapped(finding_text, f"  {i}. ", width=76)
-    else:
-        print("\n🔍 Findings: None detected")
-    
-    # Print all Recommendations
-    if recommendations:
-        print(f"\n💡 Recommendations ({len(recommendations)}):")
-        for i, rec in enumerate(recommendations, 1):
-            rec_text = rec.strip()
-            if rec_text:
-                print_wrapped(rec_text, f"  {i}. ", width=76)
-    
-    print(f"\n📄 Full report: {result.get('report_file', 'Not saved')}")
-    print("─" * 60 + "\n")
     
     return result
 
@@ -105,12 +68,18 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python run.py                                    # Use default website and model
+  python run.py                                    # Run full crew with default website and model
   python run.py --model openai/o3-mini            # Use o3-mini with default website
   python run.py --website https://example.com     # Use custom website
   python run.py --model openai/gpt-4o --website https://example.com
   python run.py --open-browser                    # Open browser during testing
   python run.py --open-browser --playwright       # Use Playwright for browser automation
+  python run.py --skip-audit                     # Only run red-team agent (skip auditor & ttp-master)
+  
+Note: By default, this runs the full crew:
+  1. Red-team agent (tests the website)
+  2. Auditor (checks if vulnerability was found)
+  3. TTP Master (maps findings to MITRE ATT&CK TTPs)
         """
     )
     
@@ -134,6 +103,11 @@ Examples:
         action="store_true",
         help="Use Playwright for browser automation (requires --open-browser)"
     )
+    parser.add_argument(
+        "--skip-audit",
+        action="store_true",
+        help="Skip running auditor and ttp-master (only run red-team agent)"
+    )
     
     args = parser.parse_args()
     
@@ -142,7 +116,8 @@ Examples:
             model=args.model,
             website=args.website,
             open_browser=args.open_browser,
-            playwright=args.playwright
+            playwright=args.playwright,
+            skip_audit=args.skip_audit
         )
     except KeyboardInterrupt:
         print("\n\n⚠️  Interrupted by user")
