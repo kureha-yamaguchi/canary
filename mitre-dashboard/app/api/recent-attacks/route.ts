@@ -5,6 +5,8 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const limit = parseInt(searchParams.get('limit') || '50');
   const includeSynthetic = searchParams.get('includeSynthetic') === 'true';
+  const websites = searchParams.get('websites')?.split(',').filter(Boolean) || [];
+  const techniques = searchParams.get('techniques')?.split(',').filter(Boolean) || [];
 
   try {
     let query = supabase
@@ -16,6 +18,16 @@ export async function GET(request: NextRequest) {
     // Filter out synthetic data unless explicitly included
     if (!includeSynthetic) {
       query = query.or('is_synthetic.is.null,is_synthetic.eq.false');
+    }
+
+    // Apply website filter if provided
+    if (websites.length > 0) {
+      query = query.in('base_url', websites);
+    }
+
+    // Apply technique filter if provided
+    if (techniques.length > 0) {
+      query = query.in('technique_id', techniques);
     }
 
     const { data, error } = await query;

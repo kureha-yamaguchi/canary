@@ -18,17 +18,30 @@ interface Attack {
 
 interface LiveAttacksFeedProps {
   includeSynthetic: boolean;
+  filterWebsite?: string;
+  filterTechnique?: string;
 }
 
-export function LiveAttacksFeed({ includeSynthetic }: LiveAttacksFeedProps) {
+export function LiveAttacksFeed({ includeSynthetic, filterWebsite, filterTechnique }: LiveAttacksFeedProps) {
   const [attacks, setAttacks] = useState<Attack[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAttacks = async () => {
     try {
-      const response = await fetch(
-        `/api/recent-attacks?limit=20&includeSynthetic=${includeSynthetic}`
-      );
+      const params = new URLSearchParams({
+        limit: '20',
+        includeSynthetic: includeSynthetic.toString()
+      });
+
+      if (filterWebsite) {
+        params.append('websites', filterWebsite);
+      }
+
+      if (filterTechnique) {
+        params.append('techniques', filterTechnique);
+      }
+
+      const response = await fetch(`/api/recent-attacks?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
         setAttacks(data);
@@ -44,7 +57,7 @@ export function LiveAttacksFeed({ includeSynthetic }: LiveAttacksFeedProps) {
     fetchAttacks();
     const interval = setInterval(fetchAttacks, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
-  }, [includeSynthetic]);
+  }, [includeSynthetic, filterWebsite, filterTechnique]);
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
