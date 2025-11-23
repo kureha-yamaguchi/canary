@@ -75,7 +75,7 @@ def format_elapsed(seconds: float) -> str:
         return f"{hours}h {mins}m"
 
 
-def run_single_url(url: str, model: str) -> Dict:
+def run_single_url(url: str, model: str, include_hints: bool = False, task: Optional[str] = None) -> Dict:
     """Run orchestrator for a single URL"""
     start_time = time.time()
     
@@ -85,10 +85,12 @@ def run_single_url(url: str, model: str) -> Dict:
         result = run_orchestrator(
             website_url=url,
             model=model,
+            task=task,
             open_browser=False,
             playwright=False,
             skip_audit=False,
-            save_audit_report=True
+            save_audit_report=True,
+            include_hints=include_hints
         )
         
         elapsed = time.time() - start_time
@@ -124,7 +126,7 @@ def run_single_url(url: str, model: str) -> Dict:
         }
 
 
-def run_batch(runs_plan_path: str, model: str):
+def run_batch(runs_plan_path: str, model: str, include_hints: bool = False, task: Optional[str] = None):
     """Run batch processing for all URLs in runs plan"""
     # Load runs plan
     runs_plan_file = Path(runs_plan_path)
@@ -146,6 +148,12 @@ def run_batch(runs_plan_path: str, model: str):
     
     # Print initial status
     print_status_bar(urls, model)
+    if include_hints:
+        print("💡 Hints: ENABLED")
+    else:
+        print("💡 Hints: DISABLED")
+    if task:
+        print(f"📝 Custom Task: {task[:80]}..." if len(task) > 80 else f"📝 Custom Task: {task}")
     
     # Run each URL
     results = {}
@@ -155,7 +163,7 @@ def run_batch(runs_plan_path: str, model: str):
         print(f"\n[{i}/{len(urls)}] Starting: {url}")
         print("-" * 100)
         
-        result = run_single_url(url, model)
+        result = run_single_url(url, model, include_hints=include_hints, task=task)
         results[url] = result
         
         # Print updated status after each run
@@ -214,10 +222,22 @@ if __name__ == "__main__":
         help="Model to use (default: meta-llama/llama-3.3-70b-instruct)"
     )
     
+    parser.add_argument(
+        "--hints",
+        action="store_true",
+        help="Include systematic testing hints in the red-team agent prompt"
+    )
+    
+    parser.add_argument(
+        "--task",
+        default=None,
+        help="Custom task/prompt for the red-team agent"
+    )
+    
     args = parser.parse_args()
     
     try:
-        run_batch(args.runs_plan, args.model)
+        run_batch(args.runs_plan, args.model, include_hints=args.hints, task=args.task)
     except KeyboardInterrupt:
         print("\n\n⚠️  Batch run interrupted by user")
         print_status_bar(list(statuses.keys()), args.model)

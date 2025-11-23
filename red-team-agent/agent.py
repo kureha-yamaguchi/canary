@@ -10,21 +10,21 @@ import os
 try:
     from .config import config
     from .tools import get_tools
-    from .prompts import get_default_task_prompt, SYSTEM_PROMPT
+    from .prompts import get_default_task_prompt, SYSTEM_PROMPT, get_system_prompt
     from .logger import AgentLogger
 except ImportError:
     # For direct script execution
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from config import config
     from tools import get_tools
-    from prompts import get_default_task_prompt, SYSTEM_PROMPT
+    from prompts import get_default_task_prompt, SYSTEM_PROMPT, get_system_prompt
     from logger import AgentLogger
 
 
 class RedTeamAgent:
     """Red Team Agent for security testing websites"""
     
-    def __init__(self, model: Optional[str] = None, website_url: Optional[str] = None, logger: Optional[AgentLogger] = None):
+    def __init__(self, model: Optional[str] = None, website_url: Optional[str] = None, logger: Optional[AgentLogger] = None, include_hints: bool = False):
         """
         Initialize the Red Team Agent
         
@@ -32,6 +32,7 @@ class RedTeamAgent:
             model: Model to use (e.g., 'openai/gpt-4o', 'anthropic/claude-3.5-sonnet')
             website_url: Target website URL to test
             logger: Optional AgentLogger instance for logging
+            include_hints: If True, include systematic testing hints in the prompt
         """
         # Validate configuration
         config.validate()
@@ -40,6 +41,7 @@ class RedTeamAgent:
         self.model_name = model or config.DEFAULT_MODEL
         self.website_url = website_url
         self.logger = logger or AgentLogger()
+        self.include_hints = include_hints
         
         # Initialize components
         self.llm = self._create_llm()
@@ -62,10 +64,13 @@ class RedTeamAgent:
         """Create the agent with tools and prompt"""
         tools = get_tools()
         
+        # Get system prompt with optional hints
+        system_prompt = get_system_prompt(include_hints=self.include_hints)
+        
         agent = create_agent(
             model=self.llm,
             tools=tools,
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             debug=True
         )
         
@@ -95,7 +100,22 @@ class RedTeamAgent:
         vulnerability = self.logger.log_data.get('vulnerability')
         vulnerability_id = vulnerability.get('vulnerability_id') if vulnerability else None
         
-        task_prompt = task or get_default_task_prompt(self.website_url, vulnerability_id)
+        # If custom task is provided, enhance it with website URL and tool usage instructions
+        if task:
+            task_prompt = f"""{task}
+
+CRITICAL: You MUST use the available tools to test the website at {self.website_url}. Do not just describe what you would do - actually call the tools!
+
+Start by using these tools:
+1. scan_website(url="{self.website_url}") - to check basic information and headers
+2. check_page_content(url="{self.website_url}") - to see the actual page and find forms/input fields
+3. discover_api_endpoints(base_url="{self.website_url}") - to find API endpoints
+4. check_information_disclosure(url="{self.website_url}") - to look for exposed sensitive data
+
+Then use other tools as needed based on what you discover. You MUST actually call the tools, not just describe them!"""
+        else:
+            task_prompt = get_default_task_prompt(self.website_url, vulnerability_id)
+        
         self.logger.log_message("human", task_prompt)
         
         if verbose:
@@ -206,7 +226,8 @@ def activate_agent(
     model: Optional[str] = None,
     task: Optional[str] = None,
     open_browser: bool = False,
-    use_playwright: bool = False
+    use_playwright: bool = False,
+    include_hints: bool = False
 ) -> dict:
     """
     Simple function to activate the red team agent
@@ -217,6 +238,7 @@ def activate_agent(
         task: Optional specific task/prompt
         open_browser: If True, open website in browser
         use_playwright: If True and open_browser is True, use Playwright for automation
+        include_hints: If True, include systematic testing hints in the prompt
     
     Returns:
         Agent execution result dictionary
@@ -237,5 +259,5 @@ def activate_agent(
             print(f"⚠️  Could not open browser: {e}")
     
     # Create and activate agent
-    agent = RedTeamAgent(model=model, website_url=website_url, logger=logger)
+    agent = RedTeamAgent(model=model, website_url=website_url, logger=logger, include_hints=include_hints)
     return agent.activate(task=task)

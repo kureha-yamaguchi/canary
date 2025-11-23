@@ -130,7 +130,7 @@
         {
             "id": 8,
             "name": "Sensitive Data Exposure - Client Side",
-            "vulnerability_type": "exposed-api-key (unsecured credentials embedded in public JavaScript bundle)",
+            "vulnerability_type": "exposed-api-key",
             "description": "API keys or secrets visible in JavaScript/HTML",
             "stack": [
                 "html",

@@ -70,7 +70,7 @@ def get_prompt_version() -> Dict[str, str]:
 
 def detect_vulnerability_from_url(website_url: str) -> Optional[Dict[str, Any]]:
     """
-    Detect what vulnerability a website has by matching it against the registry.
+    Detect what vulnerability a website has by matching it against the registry and URL mapping.
     
     Args:
         website_url: The website URL to check
@@ -79,35 +79,108 @@ def detect_vulnerability_from_url(website_url: str) -> Optional[Dict[str, Any]]:
         Dictionary with vulnerability information, or None if not found
     """
     try:
-        # Load registry.json
-        registry_path = Path(__file__).parent.parent / "deterministic-websites" / "registry.json"
-        if not registry_path.exists():
-            return None
-        
-        with open(registry_path, 'r', encoding='utf-8') as f:
-            registry = json.load(f)
-        
-        # Parse the URL to get port or path
+        # Parse the URL to get hostname
         parsed = urlparse(website_url)
+        url_host = parsed.hostname or ""
         url_port = parsed.port
         url_scheme = parsed.scheme or "http"
-        url_host = parsed.hostname or ""
         url_path = parsed.path or ""
         
-        # Determine actual port (handle default ports)
-        if url_port:
-            actual_port = url_port
-        elif url_scheme == "https":
-            actual_port = 443
-        elif url_scheme == "http":
-            actual_port = 80
-        else:
-            actual_port = None
+        # First, check url-vulnerability-mapping.json (for deployed websites)
+        mapping_path = Path(__file__).parent.parent / "data" / "url-vulnerability-mapping.json"
+        if mapping_path.exists():
+            with open(mapping_path, 'r', encoding='utf-8') as f:
+                url_mappings = json.load(f)
+            
+            # Load vulnerabilities.json to get full vulnerability details
+            vulns_path = Path(__file__).parent.parent / "data" / "vulnarabilities.json"
+            vulnerabilities = {}
+            if vulns_path.exists():
+                with open(vulns_path, 'r', encoding='utf-8') as f:
+                    vulns_data = json.load(f)
+                    for vuln in vulns_data.get("vulnerabilities", []):
+                        vulnerabilities[vuln["id"]] = vuln
+            
+            # Check each URL mapping
+            for mapping in url_mappings.get("url_mappings", []):
+                url_pattern = mapping.get("url_pattern", "")
+                # Check if the hostname contains the pattern
+                if url_pattern and url_pattern in url_host:
+                    vulnerability_ids = mapping.get("vulnerability_ids", [])
+                    if vulnerability_ids:
+                        # Use the first vulnerability ID
+                        vuln_id = vulnerability_ids[0]
+                        vuln_data = vulnerabilities.get(vuln_id, {})
+                        
+                        # Get MITRE techniques from vulnerability data
+                        mitre_techniques = []
+                        if vuln_data.get("mitre_attack"):
+                            mitre_id = vuln_data["mitre_attack"].get("technique_id", "")
+                            if mitre_id:
+                                mitre_techniques = [mitre_id]
+                        
+                        return {
+                            "vulnerability_id": vuln_id,
+                            "vulnerability_name": vuln_data.get("name", mapping.get("vulnerability_types", [""])[0] if mapping.get("vulnerability_types") else "Unknown"),
+                            "description": mapping.get("description", vuln_data.get("description", "")),
+                            "website_id": None,
+                            "website_name": None,
+                            "port": None,
+                            "mitre_techniques": mitre_techniques
+                        }
         
-        # Try to match by port first (including default ports)
-        if actual_port:
+        # Then, check registry.json (for local websites)
+        registry_path = Path(__file__).parent.parent / "deterministic-websites" / "registry.json"
+        if registry_path.exists():
+            with open(registry_path, 'r', encoding='utf-8') as f:
+                registry = json.load(f)
+            
+            # Determine actual port (handle default ports)
+            if url_port:
+                actual_port = url_port
+            elif url_scheme == "https":
+                actual_port = 443
+            elif url_scheme == "http":
+                actual_port = 80
+            else:
+                actual_port = None
+            
+            # Try to match by port first (including default ports)
+            if actual_port:
+                for website in registry.get("websites", []):
+                    if website.get("port") == actual_port:
+                        return {
+                            "vulnerability_id": website.get("vulnerability_id"),
+                            "vulnerability_name": website.get("vulnerability_name"),
+                            "description": website.get("description"),
+                            "website_id": website.get("id"),
+                            "website_name": website.get("name"),
+                            "port": website.get("port"),
+                            "mitre_techniques": website.get("mitre_techniques", [])
+                        }
+            
+            # Also try to match by explicit port number in registry
+            # (in case URL has non-standard port that matches)
+            if url_port:
+                for website in registry.get("websites", []):
+                    if website.get("port") == url_port:
+                        return {
+                            "vulnerability_id": website.get("vulnerability_id"),
+                            "vulnerability_name": website.get("vulnerability_name"),
+                            "description": website.get("description"),
+                            "website_id": website.get("id"),
+                            "website_name": website.get("name"),
+                            "port": website.get("port"),
+                            "mitre_techniques": website.get("mitre_techniques", [])
+                        }
+            
+            # Try to match by path or hostname
             for website in registry.get("websites", []):
-                if website.get("port") == actual_port:
+                website_path = website.get("path", "")
+                folder_name = website.get("folder_name", "")
+                
+                # Check if path or folder_name appears in URL
+                if website_path and (website_path in url_path or website_path in url_host):
                     return {
                         "vulnerability_id": website.get("vulnerability_id"),
                         "vulnerability_name": website.get("vulnerability_name"),
@@ -117,12 +190,8 @@ def detect_vulnerability_from_url(website_url: str) -> Optional[Dict[str, Any]]:
                         "port": website.get("port"),
                         "mitre_techniques": website.get("mitre_techniques", [])
                     }
-        
-        # Also try to match by explicit port number in registry
-        # (in case URL has non-standard port that matches)
-        if url_port:
-            for website in registry.get("websites", []):
-                if website.get("port") == url_port:
+                
+                if folder_name and (folder_name in url_path or folder_name in url_host):
                     return {
                         "vulnerability_id": website.get("vulnerability_id"),
                         "vulnerability_name": website.get("vulnerability_name"),
@@ -132,34 +201,6 @@ def detect_vulnerability_from_url(website_url: str) -> Optional[Dict[str, Any]]:
                         "port": website.get("port"),
                         "mitre_techniques": website.get("mitre_techniques", [])
                     }
-        
-        # Try to match by path or hostname
-        for website in registry.get("websites", []):
-            website_path = website.get("path", "")
-            folder_name = website.get("folder_name", "")
-            
-            # Check if path or folder_name appears in URL
-            if website_path and (website_path in url_path or website_path in url_host):
-                return {
-                    "vulnerability_id": website.get("vulnerability_id"),
-                    "vulnerability_name": website.get("vulnerability_name"),
-                    "description": website.get("description"),
-                    "website_id": website.get("id"),
-                    "website_name": website.get("name"),
-                    "port": website.get("port"),
-                    "mitre_techniques": website.get("mitre_techniques", [])
-                }
-            
-            if folder_name and (folder_name in url_path or folder_name in url_host):
-                return {
-                    "vulnerability_id": website.get("vulnerability_id"),
-                    "vulnerability_name": website.get("vulnerability_name"),
-                    "description": website.get("description"),
-                    "website_id": website.get("id"),
-                    "website_name": website.get("name"),
-                    "port": website.get("port"),
-                    "mitre_techniques": website.get("mitre_techniques", [])
-                }
         
         # Try searching in code/terminal for vulnerability mentions
         # This is a fallback if registry doesn't match

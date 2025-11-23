@@ -125,7 +125,8 @@ def run_orchestrator(
     playwright: bool = False,
     skip_audit: bool = False,
     red_team_logs_dir: Optional[str] = None,
-    save_audit_report: bool = True
+    save_audit_report: bool = True,
+    include_hints: bool = False
 ) -> dict:
     """
     Run the orchestrator: execute red-team agent, then auditor
@@ -139,6 +140,7 @@ def run_orchestrator(
         skip_audit: If True, skip running the auditor
         red_team_logs_dir: Optional directory containing red-team logs
         save_audit_report: If True, save the audit report to files
+        include_hints: If True, include systematic testing hints in the red-team agent prompt
     
     Returns:
         Dictionary containing both red-team and auditor results
@@ -154,7 +156,8 @@ def run_orchestrator(
             model=model,
             task=task,
             open_browser=open_browser,
-            use_playwright=playwright
+            use_playwright=playwright,
+            include_hints=include_hints
         )
     except Exception as e:
         print(f"\n❌ Red-team agent failed: {e}")
@@ -361,6 +364,11 @@ Examples:
         action="store_true",
         help="Don't save the audit report to files"
     )
+    parser.add_argument(
+        "--hints",
+        action="store_true",
+        help="Include systematic testing hints in the red-team agent prompt"
+    )
     
     args = parser.parse_args()
     
@@ -373,7 +381,8 @@ Examples:
             playwright=args.playwright,
             skip_audit=args.skip_audit,
             red_team_logs_dir=args.red_team_logs_dir,
-            save_audit_report=not args.no_save_audit
+            save_audit_report=not args.no_save_audit,
+            include_hints=args.hints
         )
         
         # Exit with appropriate code

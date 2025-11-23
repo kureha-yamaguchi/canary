@@ -9,7 +9,6 @@
   ],
   "urls": [
     "https://honeypot-nine.vercel.app/",
-    //"https://very-secure-website.vercel.app/", - this is not a vulnerability
     "https://honeypot-jwt-alg-confusion.vercel.app/",
     "https://neuralmarket.vercel.app/",
     "https://try-to-hack-dg3d7c26y-hussains-projects-4b735dc9.vercel.app/",
